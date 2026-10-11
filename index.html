@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f3f5ef">
+    <title>Filecoin Onchain Cloud Dashboard</title>
+    <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body>
+    <main>
+        <header>
+            <p class="eyebrow">Filecoin Onchain Cloud</p>
+            <h1>Hosted data overview.</h1>
+            <p class="intro">Look up datasets for an FEVM address, inspect stored Pieces, and view their corresponding IPFS root CIDs.</p>
+        </header>
+
+        <form class="lookup" id="lookupForm">
+            <div>
+                <label for="walletAddress">FEVM address</label>
+                <input id="walletAddress" name="walletAddress" type="text" spellcheck="false" autocomplete="off" placeholder="0x…" aria-describedby="addressHint" required>
+            </div>
+            <button id="fetchBtn" type="submit">Look up address</button>
+            <div class="network-switch" role="radiogroup" aria-label="Filecoin network">
+                <label class="network-choice"><input type="radio" name="network" value="mainnet" checked><span>Mainnet</span></label>
+                <label class="network-choice"><input type="radio" name="network" value="calibration"><span>Calibration</span></label>
+            </div>
+            <p class="hint" id="addressHint">Enter an Ethereum-compatible Filecoin address starting with 0x. Only public read calls are made.</p>
+        </form>
+
+        <section id="accountOverview" aria-live="polite" hidden>
+            <hr class="section-divider">
+            <div class="summary">
+                <h2>Balances and storage runway</h2>
+                <span>Wallet and Filecoin Pay</span>
+            </div>
+            <div id="balances" class="balances">
+                <div class="balance-group">
+                    <h3>Wallet balances</h3>
+                    <div class="balance-metrics">
+                        <div><span>FIL balance</span><strong id="filBalance">Loading …</strong></div>
+                        <div><span>USDFC in wallet</span><strong id="usdfcBalance">Loading …</strong></div>
+                    </div>
+                </div>
+                <div class="balance-group">
+                    <h3>Filecoin Pay storage</h3>
+                    <div class="balance-subsection">
+                        <h4>Prediction</h4>
+                        <div class="balance-metrics">
+                            <div><span>Storage runway</span><strong id="storageRunway">Loading …</strong></div>
+                            <div><span>Total monthly storage cost</span><strong id="totalMonthlyCost" title="Current Filecoin Pay rate across active payment rails, expressed per 86,400 epochs.">Loading …</strong></div>
+                        </div>
+                    </div>
+                    <div class="balance-subsection">
+                        <h4>Account deposits</h4>
+                        <div class="balance-metrics">
+                            <div><span>Total amount</span><strong id="payTotalAmount">Loading …</strong></div>
+                            <div><span>Available for withdrawal</span><strong id="payAvailableAmount">Loading …</strong></div>
+                            <div><span>Amount locked</span><strong id="payLockedAmount">Loading …</strong></div>
+                        </div>
+                    </div>
+                </div>
+                <p class="balance-hint">Filecoin Pay amounts are denominated in USDFC; available funds exclude amounts locked by active rails. FIL is required for transaction fees. Monthly storage cost reflects active rail rates; usage-based egress and one-time operation fees can vary separately.</p>
+            </div>
+        </section>
+
+        <section id="results" aria-live="polite" aria-busy="false">
+            <p class="empty-state">Enter an address to view its datasets and pieces.</p>
+        </section>
+
+        <footer>Version 0.1.0 · <a href="https://github.com/dgrafe/foc-dashboard" target="_blank" rel="noopener noreferrer" title="Open the project on GitHub">GitHub</a></footer>
+    </main>
+
+    <script type="module" src="./js/app.js"></script>
+</body>
+</html>
