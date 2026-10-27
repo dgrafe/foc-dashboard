@@ -1,14 +1,9 @@
 import { calibration, mainnet } from "https://esm.sh/@filoz/synapse-core@0.10.0/chains?bundle";
+export { CAR_ROOT_LOAD_CONCURRENCY, MAX_UINT256, MAX_TREE_SCAN_BYTES, MAX_TREE_NODES, CAR_HEADER_RANGE_BYTES, CAR_TAIL_INITIAL_RANGE_BYTES, CAR_TAIL_RANGE_BYTES } from "./limits.js";
 export { calibration, mainnet };
 
 export const PAGE_SIZE = 100n;
 export const DATASET_LOAD_CONCURRENCY = 2;
-export const MAX_UINT256 = (1n << 256n) - 1n;
-export const MAX_TREE_SCAN_BYTES = 1024 * 1024 * 1024;
-export const MAX_TREE_NODES = 10000;
-export const CAR_HEADER_RANGE_BYTES = 16384;
-export const CAR_TAIL_INITIAL_RANGE_BYTES = 16 * 1024;
-export const CAR_TAIL_RANGE_BYTES = 4 * 1024 * 1024;
 
 export const dataSetComponents = [
             { name: "pdpRailId", type: "uint256" },

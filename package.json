@@ -1,0 +1,21 @@
+{
+  "private": true,
+  "license": "MIT",
+  "author": "dgrafe",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "build": "node scripts/build.mjs",
+    "release": "npm test && npm run build"
+  },
+  "devDependencies": {
+    "@filoz/synapse-core": "0.10.0",
+    "@ipld/car": "5.4.7",
+    "@ipld/dag-pb": "4.2.0",
+    "@ipld/unixfs": "3.0.0",
+    "esbuild": "0.28.2",
+    "ipfs-unixfs": "11.2.5",
+    "multiformats": "13.4.2",
+    "viem": "2.57.11"
+  }
+}

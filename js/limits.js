@@ -1,0 +1,14 @@
+export const CAR_ROOT_LOAD_CONCURRENCY = 4;
+export const MAX_UINT256 = (1n << 256n) - 1n;
+export const MAX_TREE_SCAN_BYTES = 1024 * 1024 * 1024;
+export const MAX_TREE_NODES = 10000;
+export const CAR_HEADER_RANGE_BYTES = 16384;
+export const CAR_TAIL_INITIAL_RANGE_BYTES = 16 * 1024;
+export const CAR_TAIL_RANGE_BYTES = 4 * 1024 * 1024;
+export const CAR_RANGE_TIMEOUT_MS = 20000;
+export const CAR_STREAM_TIMEOUT_MS = 5 * 60 * 1000;
+export const RPC_TIMEOUT_MS = 15000;
+export const RPC_MAX_RETRIES = 2;
+export const RPC_RETRY_BASE_DELAY_MS = 300;
+export const MAX_DUPLICATE_LINKS = 5;
+export const PIECE_RENDER_CHUNK = 100;
