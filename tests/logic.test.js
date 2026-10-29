@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { encodeFunctionData, decodeFunctionResult, encodeFunctionResult } from "viem";
+import { base32 } from "multiformats/bases/base32";
+import { blake2b } from "@noble/hashes/blake2b";
 import { addPieceToIndex, countDuplicateCopies, getDuplicateCopies } from "../js/piece-index.js";
 
 test("duplicate copies can be limited while the total is still known", () => {
@@ -15,6 +17,53 @@ test("duplicate copies can be limited while the total is still known", () => {
 });
 import { createRpc } from "../js/rpc.js";
 import { hexToBytes, parseCarRoots, parseContentRangeTotal, piecePayloadSizeFromBytes } from "../js/car.js";
+import { resolveLookupInput } from "../js/lookup.js";
+import { filecoinAddressToEthAddress } from "../js/filecoin-address.js";
+
+test("keeps direct FEVM address lookup and skips ENS resolution", async () => {
+    const address = `0x${"a".repeat(40)}`;
+    let resolved = false;
+    assert.equal(await resolveLookupInput(` ${address} `, async () => { resolved = true; }), address);
+    assert.equal(resolved, false);
+});
+
+test("resolves ENS names and validates the returned address", async () => {
+    const address = `0x${"b".repeat(40)}`;
+    let name;
+    assert.equal(await resolveLookupInput(" alice.eth ", async (value) => {
+        name = value;
+        return address;
+    }), address);
+    assert.equal(name, "alice.eth");
+});
+
+test("converts valid Filecoin f410 and t410 addresses to Ethereum addresses", async () => {
+    const address = "0xd388ab098ed3e84c0d808776440b48f685198498";
+    const filecoinAddress = "t410f2oekwcmo2pueydmaq53eic2i62crtbeyuzx2gmy";
+    const resolver = (value) => filecoinAddressToEthAddress(value, base32, blake2b);
+
+    assert.equal(filecoinAddressToEthAddress(filecoinAddress, base32, blake2b), address);
+    assert.equal(await resolveLookupInput(filecoinAddress, async () => null, resolver), address);
+    assert.equal(await resolveLookupInput(filecoinAddress.replace(/^t/, "f"), async () => null, resolver), address);
+});
+
+test("rejects malformed or checksum-invalid Filecoin EVM addresses", () => {
+    const resolver = (value) => filecoinAddressToEthAddress(value, base32, blake2b);
+    assert.throws(() => resolver("f410fnot-an-address"), /valid f410 or t410 Filecoin address/);
+    assert.throws(() => resolver("f410f2oekwcmo2pueydmaq53eic2i62crtbeyuzx2gnx"), /valid f410 or t410 Filecoin address/);
+});
+
+test("rejects malformed direct addresses and ENS names without addresses", async () => {
+    await assert.rejects(resolveLookupInput(" ", async () => null), /Enter a 0x, f410, or t410 address/);
+    await assert.rejects(resolveLookupInput("0xabc", async () => {
+        throw new Error("ENS resolver should not be called");
+    }), /valid 0x address/);
+    await assert.rejects(resolveLookupInput("unknown.eth", async () => null), /Could not resolve name/);
+    await assert.rejects(resolveLookupInput("unknown.eth", async () => "not an address"), /Could not resolve name/);
+    await assert.rejects(resolveLookupInput("offline.eth", async () => {
+        throw new Error("RPC unavailable");
+    }), /Could not resolve name/);
+});
 
 test("parseContentRangeTotal reads the total length", () => {
     assert.equal(parseContentRangeTotal("bytes 0-16383/123456"), 123456);

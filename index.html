@@ -12,20 +12,20 @@
         <header>
             <p class="eyebrow">Filecoin Onchain Cloud</p>
             <h1>Hosted data overview.</h1>
-            <p class="intro">Look up datasets for an FEVM address, inspect stored Pieces, and view their corresponding IPFS root CIDs.</p>
+            <p class="intro">Look up datasets for an FEVM address or ENS name, inspect stored Pieces, and view their corresponding IPFS root CIDs.</p>
         </header>
 
         <form class="lookup" id="lookupForm">
             <div>
-                <label for="walletAddress">FEVM address</label>
-                <input id="walletAddress" name="walletAddress" type="text" spellcheck="false" autocomplete="off" placeholder="0x…" aria-describedby="addressHint" required>
+                <label for="walletAddress">FEVM address (0x, f410, t410) or ENS name</label>
+                <input id="walletAddress" name="walletAddress" type="text" spellcheck="false" autocomplete="off" placeholder="0x…, f410… or name.eth" aria-describedby="addressHint" required>
             </div>
-            <button id="fetchBtn" type="submit">Look up address</button>
+            <button id="fetchBtn" type="submit">Look up address or ENS</button>
             <div class="network-switch" role="radiogroup" aria-label="Filecoin network">
                 <label class="network-choice"><input type="radio" name="network" value="mainnet" checked><span>Mainnet</span></label>
                 <label class="network-choice"><input type="radio" name="network" value="calibration"><span>Calibration</span></label>
             </div>
-            <p class="hint" id="addressHint">Enter an Ethereum-compatible Filecoin address starting with 0x. Only public read calls are made.</p>
+            <p class="hint" id="addressHint">Enter a 0x, f410 or t410 address, or an ENS name. ENS names are resolved on Ethereum Mainnet; only public read calls are made.</p>
         </form>
 
         <section id="accountOverview" aria-live="polite" hidden>
@@ -65,7 +65,7 @@
         </section>
 
         <section id="results" aria-live="polite" aria-busy="false">
-            <p class="empty-state">Enter an address to view its datasets and pieces.</p>
+            <p class="empty-state">Enter a FEVM address or ENS name to view its datasets and pieces.</p>
         </section>
 
         <footer>Version 0.2.0 · <a href="https://github.com/dgrafe/foc-dashboard" target="_blank" rel="noopener noreferrer" title="Open the project on GitHub">GitHub</a></footer>

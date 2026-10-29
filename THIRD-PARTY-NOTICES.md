@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-The dashboard loads these third-party packages at runtime from esm.sh. They are not vendored or bundled in this repository. Each package remains subject to its own license; the MIT license for this project does not replace or extend those licenses.
+During development, the browser loads these packages from esm.sh. Release builds bundle the dependencies into hashed assets. The dependencies are not vendored as source in this repository, and each package remains subject to its own license; the MIT license for this project does not replace or extend those licenses.
 
 | Package | License | Upstream license |
 | --- | --- | --- |
@@ -11,5 +11,6 @@ The dashboard loads these third-party packages at runtime from esm.sh. They are 
 | `@ipld/dag-pb@4` | Apache-2.0 OR MIT | [ipld/js-dag-pb](https://github.com/ipld/js-dag-pb) |
 | `ipfs-unixfs@11` | MIT AND Apache-2.0 | [ipfs/js-ipfs-unixfs](https://github.com/ipfs/js-ipfs-unixfs/blob/main/LICENSE) |
 | `multiformats@13` | Apache-2.0 OR MIT | [multiformats/js-multiformats](https://github.com/multiformats/js-multiformats) |
+| `@noble/hashes@1.8.0` | MIT | [paulmillr/noble-hashes](https://github.com/paulmillr/noble-hashes/blob/main/LICENSE) |
 
 The license terms apply to the package versions served by the CDN. Consult the upstream package metadata and license files for the exact notices applicable to the version in use.

@@ -1,30 +1,23 @@
-import { getAccountSummary } from "https://esm.sh/@filoz/synapse-core@0.10.0/pay?bundle";
-import { calibration, mainnet, DATASET_LOAD_CONCURRENCY, usdfcAbi } from "./constants.js";
-import { formatStorageHorizon, formatUnits, formatUnitsFixed, formatUnitsRounded } from "./format.js";
+import { calibration, mainnet, DATASET_LOAD_CONCURRENCY } from "./constants.js";
 import { mapWithConcurrency } from "./concurrency.js";
 import { state, configureNetwork, getNetworkName, startSearch } from "./state.js";
-import { calculateDatasetMonthlyCosts, fetchAllDataSets, rpcCall, rpcRequest } from "./chain-api.js";
+import { calculateDatasetMonthlyCosts, fetchAllDataSets } from "./chain-api.js";
 import { carQueue, rowRegistry } from "./pieces-ui.js";
 import { createDatasetCard, populateDataset } from "./datasets-ui.js";
+import { hideAccountOverview, loadBalances } from "./account-ui.js";
+import { resolveAddressInput } from "./address-resolution.js";
 
 const form = document.getElementById("lookupForm");
 const addressInput = document.getElementById("walletAddress");
 const fetchButton = document.getElementById("fetchBtn");
 const networkOptions = Array.from(document.querySelectorAll('input[name="network"]'));
 const results = document.getElementById("results");
-const accountOverview = document.getElementById("accountOverview");
-const filBalance = document.getElementById("filBalance");
-const usdfcBalance = document.getElementById("usdfcBalance");
-const storageRunway = document.getElementById("storageRunway");
-const totalMonthlyCost = document.getElementById("totalMonthlyCost");
-const payTotalAmount = document.getElementById("payTotalAmount");
-const payAvailableAmount = document.getElementById("payAvailableAmount");
-const payLockedAmount = document.getElementById("payLockedAmount");
-
 form.addEventListener("submit", (event) => {
     event.preventDefault();
     loadDatasets();
 });
+
+addressInput.addEventListener("input", () => addressInput.setCustomValidity(""));
 
 function getSelectedChain() {
     return networkOptions.find((option) => option.checked)?.value === "calibration" ? calibration : mainnet;
@@ -37,71 +30,49 @@ function showMessage(message, isError = false) {
     results.replaceChildren(box);
 }
 
-async function loadBalances(address, isStale = () => false) {
-    accountOverview.hidden = false;
-    filBalance.textContent = "Loading …";
-    usdfcBalance.textContent = "Loading …";
-    storageRunway.textContent = "Loading …";
-    totalMonthlyCost.textContent = "Loading …";
-    payTotalAmount.textContent = "Loading …";
-    payAvailableAmount.textContent = "Loading …";
-    payLockedAmount.textContent = "Loading …";
-    const [filResult, usdfcResult, accountSummaryResult] = await Promise.allSettled([
-        rpcRequest("eth_getBalance", [address, "latest"]).then((value) => formatUnits(BigInt(value), 18)),
-        Promise.all([
-            rpcCall(state.usdfcToken, usdfcAbi, "balanceOf", [address]),
-            rpcCall(state.usdfcToken, usdfcAbi, "decimals", [])
-        ]).then(([balance, decimals]) => formatUnitsFixed(BigInt(balance), Number(decimals))),
-        getAccountSummary(state.readClient, { address })
-    ]);
-    if (isStale() || addressInput.value.trim().toLowerCase() !== address.toLowerCase()) return;
-    filBalance.textContent = filResult.status === "fulfilled" ? `${filResult.value} FIL` : "Unavailable";
-    usdfcBalance.textContent = usdfcResult.status === "fulfilled" ? `${usdfcResult.value} USDFC` : "Unavailable";
-    if (accountSummaryResult.status === "fulfilled") {
-        const summary = accountSummaryResult.value;
-        storageRunway.textContent = formatStorageHorizon(summary.runwayInEpochs, summary.lockupRatePerEpoch, summary.debt, true);
-        totalMonthlyCost.textContent = `${formatUnitsRounded(summary.lockupRatePerMonth, 18)} USDFC/mo`;
-        payTotalAmount.textContent = `${formatUnits(summary.funds, 18)} USDFC`;
-        payAvailableAmount.textContent = `${formatUnits(summary.availableFunds, 18)} USDFC`;
-        payLockedAmount.textContent = `${formatUnits(summary.totalLockup, 18)} USDFC`;
-    } else {
-        storageRunway.textContent = "Unavailable";
-        totalMonthlyCost.textContent = "Unavailable";
-        payTotalAmount.textContent = "Unavailable";
-        payAvailableAmount.textContent = "Unavailable";
-        payLockedAmount.textContent = "Unavailable";
-        console.warn("Storage runway could not be loaded.", accountSummaryResult.reason);
-    }
-    if (filResult.status === "rejected") console.warn("FIL balance could not be loaded.", filResult.reason);
-    if (usdfcResult.status === "rejected") console.warn("USDFC balance could not be loaded.", usdfcResult.reason);
-}
-
 async function loadDatasets() {
-    const address = addressInput.value.trim();
-    if (!/^0x[\da-fA-F]{40}$/.test(address)) {
-        addressInput.setCustomValidity("Enter a valid 0x address with 40 hexadecimal characters.");
-        addressInput.reportValidity();
-        return;
-    }
+    const lookupInput = addressInput.value.trim();
     addressInput.setCustomValidity("");
     const isStale = startSearch();
     carQueue.clear();
     rowRegistry.clear();
-    configureNetwork(getSelectedChain());
-    loadBalances(address, isStale);
+    hideAccountOverview();
     fetchButton.disabled = true;
-    fetchButton.textContent = "Loading data …";
+    fetchButton.textContent = lookupInput.startsWith("0x") || /^[ft]410/i.test(lookupInput) ? "Loading data …" : "Resolving ENS …";
     networkOptions.forEach((option) => { option.disabled = true; });
     results.setAttribute("aria-busy", "true");
-    showMessage(`Reading datasets from ${getNetworkName(state.chain)} and loading piece lists …`);
+    showMessage(lookupInput.startsWith("0x") || /^[ft]410/i.test(lookupInput)
+        ? "Preparing address lookup …"
+        : `Resolving ${lookupInput || "ENS name"} on Ethereum Mainnet …`);
 
     try {
+        let address;
+        try {
+            address = await resolveAddressInput(lookupInput);
+        } catch (error) {
+            if (!isStale()) {
+                addressInput.setCustomValidity(error.message);
+                addressInput.reportValidity();
+                showMessage(error.message, true);
+            }
+            return;
+        }
+        if (isStale()) return;
+
+        addressInput.setCustomValidity("");
+        configureNetwork(getSelectedChain());
+        fetchButton.textContent = "Loading data …";
+        showMessage(`Reading datasets from ${getNetworkName(state.chain)} and loading piece lists …`);
+
         const dataSets = await fetchAllDataSets(address);
         if (isStale()) return;
         if (dataSets.length === 0) {
             showMessage("No FWSS datasets were found for this address.");
             return;
         }
+        loadBalances(address, () =>
+            !isStale() && addressInput.value.trim().toLowerCase() === lookupInput.toLowerCase()
+        );
 
         const datasetPanel = document.createElement("div");
         datasetPanel.id = "datasetPanel";
@@ -156,7 +127,7 @@ async function loadDatasets() {
     } finally {
         if (!isStale()) {
             fetchButton.disabled = false;
-            fetchButton.textContent = "Look up address";
+            fetchButton.textContent = "Look up address or ENS";
             networkOptions.forEach((option) => { option.disabled = false; });
             results.setAttribute("aria-busy", "false");
         }

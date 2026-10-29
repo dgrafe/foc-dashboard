@@ -1,10 +1,12 @@
 # Filecoin Onchain Cloud Dashboard
 
-A static, client-side dashboard for the [Filecoin Onchain Cloud](https://docs.filecoin.cloud/), focused on data hosted through [Filecoin Warm Storage](https://docs.filecoin.cloud/core-concepts/fwss-overview/). Look up an FEVM address to review its datasets and Pieces, along with wallet balances, Filecoin Pay deposits, storage runway, and estimated monthly storage costs.
+A static, client-side dashboard for the [Filecoin Onchain Cloud](https://docs.filecoin.cloud/), focused on data hosted through [Filecoin Warm Storage](https://docs.filecoin.cloud/core-concepts/fwss-overview/). Look up an FEVM address or ENS name to review its datasets and Pieces, along with wallet balances, Filecoin Pay deposits, storage runway, and estimated monthly storage costs.
 
 ## Features
 
 - Filecoin Mainnet and Calibration support
+- `0x`, `f410`, and `t410` EVM addresses are supported; native `f410`/`t410` addresses are checksum-validated and converted to their equivalent `0x` address
+- ENS names are resolved on Ethereum Mainnet and can be used to look up an address on either Filecoin network
 - Dataset, provider, and payment rail links
 - Piece CIDs and CAR root CIDs, with copy controls
 - CAR root lookups run during loading, limited to four concurrent requests; a dataset card is shown only once everything (including CAR roots) is loaded, with a progress bar until then
@@ -41,25 +43,37 @@ npm run build     # build only
 
 `dist/` then contains only `index.html`, the minified and hashed bundles in `assets/` (dependencies included, no `esm.sh` at runtime), `LICENSE`, and `THIRD-PARTY-NOTICES.md`. Publish the contents of `dist/` as the site root. During development the sources still run unbundled and load dependencies from `esm.sh`; the build maps those URLs to the exact versions pinned in `package.json`, so keep both in sync when upgrading. The app makes browser requests to Filecoin RPC endpoints and storage providers, so those endpoints must allow cross-origin requests (CORS).
 
+## Address lookup
+
+The lookup accepts:
+
+- Ethereum-style `0x` addresses (40 hexadecimal characters)
+- Native Filecoin EVM addresses: `f410...` for Mainnet and `t410...` for Calibration
+- ENS names, resolved through Ethereum Mainnet
+
+Native `f410` and `t410` addresses are checksum-validated and converted to their equivalent `0x` address before querying. The selected Filecoin network switch determines which chain is queried.
+
 ## License
 
 Project code is licensed under the [MIT License](LICENSE). Runtime dependencies are governed by their own licenses; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Project Structure
 
-```text
-index.html       Page markup
-css/styles.css   Styles
-js/app.js        Entry point: form, balances, dataset loading flow
-js/state.js      Shared network and search state
-js/chain-api.js  RPC reads, provider lookup, monthly costs
-js/car-queue.js  DOM-free CAR root queue with progress
-js/datasets-ui.js  Dataset cards and piece loading
-js/pieces-ui.js  Piece rows, lazy rendering, file tree, CAR roots
-js/ui-widgets.js Copy button, download links, small helpers
-js/car.js        CAR parsing and UnixFS tree inspection
-js/constants.js  Chain configurations, limits, and contract ABIs
-js/format.js     Storage and token value formatting
-js/limits.js     Shared safety and request limits
-tests/           Data-processing and formatting tests
-```
+| Path | Responsibility |
+| --- | --- |
+| `index.html`, `css/styles.css` | Page markup and styles |
+| `js/app.js` | Entry point, lookup form, dataset loading |
+| `js/account-ui.js` | Account balances and storage runway display |
+| `js/address-resolution.js` | Compose ENS and Filecoin address resolvers |
+| `js/ens.js` | Ethereum Mainnet ENS client |
+| `js/filecoin-address.js` | Validate and convert `f410`/`t410` addresses |
+| `js/lookup.js` | Validate and dispatch lookup input |
+| `js/state.js` | Shared network and search state |
+| `js/chain-api.js` | RPC reads, provider lookup, monthly costs |
+| `js/datasets-ui.js`, `js/pieces-ui.js` | Dataset cards, piece rows, file tree, CAR roots |
+| `js/car-queue.js` | DOM-free CAR root queue and progress |
+| `js/car.js` | CAR parsing and UnixFS tree inspection |
+| `js/ui-widgets.js` | Copy controls, download links, small helpers |
+| `js/constants.js`, `js/limits.js` | Chain configuration, ABIs, safety and request limits |
+| `js/format.js` | Storage and token value formatting |
+| `tests/` | Data-processing, formatting, and UI-logic tests |
