@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Filecoin Onchain Cloud dashboard">
+    <rect width="32" height="32" rx="7" fill="#126b50"/>
+    <path d="M16 6.5 8.5 10.6v7.2L16 21.9l7.5-4.1v-7.2L16 6.5Z" fill="#c9eb83"/>
+    <path d="M16 12.2 12 14.4v4.4l4 2.2 4-2.2v-4.4L16 12.2Z" fill="#126b50"/>
+    <path d="M16 21.9v4.6" stroke="#c9eb83" stroke-width="2" stroke-linecap="round"/>
+</svg>

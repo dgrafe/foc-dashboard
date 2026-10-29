@@ -1,12 +1,24 @@
 {
+  "name": "foc-dashboard",
+  "version": "0.4.0",
+  "description": "Static client-side dashboard for Filecoin Onchain Cloud datasets, pieces and Filecoin Pay balances.",
   "private": true,
   "license": "MIT",
   "author": "dgrafe",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dgrafe/foc-dashboard.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "node --test",
+    "check:notices": "node scripts/check-notices.mjs",
+    "dev": "node scripts/serve.mjs",
     "build": "node scripts/build.mjs",
-    "release": "npm test && npm run build"
+    "release": "npm test && npm run check:notices && npm run build"
   },
   "overrides": {
     "@filoz/synapse-core": {

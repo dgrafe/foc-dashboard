@@ -1,5 +1,7 @@
 import { createPublicClient, http } from "https://esm.sh/viem@2?bundle";
 import { calibration, mainnet } from "./constants.js";
+import { fetchWithTimeout } from "./fetch-timeout.js";
+import { RPC_TIMEOUT_MS } from "./limits.js";
 
 // Shared mutable state; consumers read fields at call time so network switches apply everywhere.
 export const state = {
@@ -9,10 +11,26 @@ export const state = {
     pdpVerifier: mainnet.contracts.pdp.address,
     providerRegistry: mainnet.contracts.serviceProviderRegistry.address,
     usdfcToken: mainnet.contracts.usdfc.address,
-    readClient: createPublicClient({ chain: mainnet, transport: http(mainnet.rpcUrls.default.http[0]) }),
+    readClient: createReadClient(mainnet),
     searchId: 0,
     searchController: new AbortController()
 };
+
+// Routing viem requests through fetchWithTimeout keeps them tied to the active search,
+// so library helpers such as getRail or getAccountSummary abort with a new lookup.
+// viem must not retry here: a retry would read the replacement controller and outlive the search.
+function createReadClient(chain) {
+    return createPublicClient({
+        chain,
+        transport: http(chain.rpcUrls.default.http[0], {
+            retryCount: 0,
+            fetchFn: (url, init) => fetchWithTimeout(url, init, {
+                signal: state.searchController.signal,
+                timeoutMs: RPC_TIMEOUT_MS
+            })
+        })
+    });
+}
 
 export function configureNetwork(chain) {
     state.chain = chain;
@@ -21,7 +39,7 @@ export function configureNetwork(chain) {
     state.pdpVerifier = chain.contracts.pdp.address;
     state.providerRegistry = chain.contracts.serviceProviderRegistry.address;
     state.usdfcToken = chain.contracts.usdfc.address;
-    state.readClient = createPublicClient({ chain, transport: http(state.rpcUrl) });
+    state.readClient = createReadClient(chain);
 }
 
 export function getNetworkName(chain) {

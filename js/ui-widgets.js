@@ -94,6 +94,16 @@ export async function copyPieceCid(cid, status) {
     }
 }
 
+// Links placed inside a <summary> would otherwise toggle the <details> as well as navigating.
+export function keepLinkInteractive(link) {
+    const stop = (event) => event.stopPropagation();
+    link.addEventListener("click", stop);
+    link.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") stop(event);
+    });
+    return link;
+}
+
 export function addEmptyPieces(container, message) {
     const line = document.createElement("p");
     line.className = "piece-result pending";

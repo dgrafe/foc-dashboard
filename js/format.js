@@ -1,4 +1,4 @@
-import { MAX_UINT256 } from "./limits.js";
+import { MAX_UINT256, EPOCH_SECONDS, EPOCHS_PER_DAY, EPOCHS_PER_HOUR, LARGE_DOWNLOAD_BYTES } from "./limits.js";
 
 export function formatBytes(size) {
     const units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
@@ -9,6 +9,11 @@ export function formatBytes(size) {
         unit++;
     }
     return `${unit === 0 ? value : value.toFixed(2)} ${units[unit]}`;
+}
+
+// Download warnings are only worth showing for pieces that are genuinely large.
+export function isLargeDownload(size) {
+    return size !== null && size >= LARGE_DOWNLOAD_BYTES;
 }
 
 export function formatUnits(value, decimals, maxFractionDigits = 4) {
@@ -39,10 +44,10 @@ export function formatStorageHorizon(epochs, ratePerEpoch, debt = 0n, isRunway =
     if (epochs === 0n) return isRunway ? "0 days · top-up required" : "0 days";
     if (epochs > BigInt(Number.MAX_SAFE_INTEGER)) return "Very long runway";
 
-    const days = epochs / 2880n;
-    const hours = (epochs % 2880n) / 120n;
+    const days = epochs / EPOCHS_PER_DAY;
+    const hours = (epochs % EPOCHS_PER_DAY) / EPOCHS_PER_HOUR;
     const duration = days > 0n ? `${days} days ${hours} hr` : `${hours} hr`;
-    const estimatedEnd = new Date(Date.now() + Number(epochs) * 30_000);
+    const estimatedEnd = new Date(Date.now() + Number(epochs) * EPOCH_SECONDS * 1000);
     const date = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(estimatedEnd);
     return `${duration} · until approx. ${date}`;
 }

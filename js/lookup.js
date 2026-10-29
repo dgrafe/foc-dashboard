@@ -1,4 +1,11 @@
 const ADDRESS_PATTERN = /^0x[\da-fA-F]{40}$/;
+const FILECOIN_EVM_PATTERN = /^[ft]410/i;
+
+// True for inputs that are looked up directly instead of being treated as ENS names.
+export function isDirectAddressInput(value) {
+    const trimmed = value.trim();
+    return trimmed.startsWith("0x") || FILECOIN_EVM_PATTERN.test(trimmed);
+}
 
 export async function resolveLookupInput(input, resolveEnsName, resolveFilecoinAddress) {
     const value = input.trim();
@@ -9,7 +16,7 @@ export async function resolveLookupInput(input, resolveEnsName, resolveFilecoinA
         }
         return value;
     }
-    if (/^[ft]410/i.test(value)) {
+    if (FILECOIN_EVM_PATTERN.test(value)) {
         if (!resolveFilecoinAddress) throw new Error("Filecoin address conversion is unavailable.");
         return resolveFilecoinAddress(value);
     }

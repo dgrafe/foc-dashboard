@@ -1,10 +1,11 @@
 import { pieceBytesToCid, piecePayloadSizeFromBytes } from "./car.js";
 import { formatBytes } from "./format.js";
 import { addPieceToIndex } from "./piece-index.js";
-import { PIECE_RENDER_CHUNK } from "./limits.js";
+import { MAX_PIECES, PIECE_RENDER_CHUNK } from "./limits.js";
+import { PAY_EXPLORER_URL, PDP_EXPLORER_URL } from "./constants.js";
 import { state, getNetworkPath } from "./state.js";
 import { fetchPiecePage, getDatasetFeatures, getProviderServiceUrl } from "./chain-api.js";
-import { addEmptyPieces } from "./ui-widgets.js";
+import { addEmptyPieces, keepLinkInteractive } from "./ui-widgets.js";
 import { carQueue, renderMoreRows, rowRegistry, updatePieceDuplicateReferences } from "./pieces-ui.js";
 
 export function createDatasetCard(dataSet) {
@@ -24,12 +25,12 @@ export function createDatasetCard(dataSet) {
     const rail = document.createElement("div");
     rail.className = "dataset-meta dataset-endpoint";
     const railLink = document.createElement("a");
-    railLink.href = `https://pay.filecoin.cloud/${getNetworkPath()}/rails/${dataSet.pdpRailId}`;
+    railLink.href = `${PAY_EXPLORER_URL}/${getNetworkPath()}/rails/${dataSet.pdpRailId}`;
     railLink.target = "_blank";
     railLink.rel = "noopener noreferrer";
     railLink.textContent = dataSet.pdpRailId.toString();
     railLink.title = "Open payment rail on Filecoin Pay";
-    rail.append("Payment Rail: ", railLink);
+    rail.append("Payment Rail: ", keepLinkInteractive(railLink));
     const features = document.createElement("div");
     features.className = "dataset-features";
     renderDatasetFeatures(features, null);
@@ -67,12 +68,12 @@ export async function populateDataset(card, dataSet, address, pieceIndex, monthl
         if (providerServiceUrl) {
             const serviceUrl = new URL(providerServiceUrl);
             const link = document.createElement("a");
-            link.href = `https://pdp.filecoin.cloud/${getNetworkPath()}/providers/${dataSet.serviceProvider.toLowerCase()}`;
+            link.href = `${PDP_EXPLORER_URL}/${getNetworkPath()}/providers/${dataSet.serviceProvider.toLowerCase()}`;
             link.target = "_blank";
             link.rel = "noopener noreferrer";
             link.textContent = serviceUrl.origin;
             link.title = "Open provider entry on PDP Explorer";
-            card.endpoint.append(document.createTextNode("Provider Endpoint: "), link);
+            card.endpoint.append(document.createTextNode("Provider Endpoint: "), keepLinkInteractive(link));
             card.endpoint.hidden = false;
         }
     } catch (error) {
@@ -94,7 +95,7 @@ export async function populateDataset(card, dataSet, address, pieceIndex, monthl
     let piecesLoaded = false;
     const dirtyPieces = new Set();
     try {
-        while (pieceCount < 50000) {
+        while (pieceCount < MAX_PIECES) {
             const [pieces, ids, hasMore] = await fetchPiecePage(dataSet.dataSetId, cursor);
             if (isStale()) return;
             for (let index = 0; index < pieces.length; index++) {
@@ -144,7 +145,7 @@ export async function populateDataset(card, dataSet, address, pieceIndex, monthl
     if (isStale()) return;
     updateDatasetBadge(card.badge, pieceCount, totalPieceSize, unknownSizeCount, false, monthlyCostLabel);
     if (pieceCount === 0) addEmptyPieces(card.pieces, "No active pieces in this dataset.");
-    if (pieceCount >= 50000) addEmptyPieces(card.pieces, "Display limited to 50,000 pieces.");
+    if (pieceCount >= MAX_PIECES) addEmptyPieces(card.pieces, `Display limited to ${MAX_PIECES.toLocaleString("en-US")} pieces.`);
     await Promise.all(card.rootLoads);
 }
 

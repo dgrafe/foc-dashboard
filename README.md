@@ -9,6 +9,7 @@ A static, client-side dashboard for the [Filecoin Onchain Cloud](https://docs.fi
 - ENS names are resolved on Ethereum Mainnet and can be used to look up an address on either Filecoin network
 - Dataset, provider, and payment rail links
 - Piece CIDs and CAR root CIDs, with copy controls
+- Downloads of pieces of 1 GiB or more carry a visible size warning, since each link pulls a full CAR file
 - CAR root lookups run during loading, limited to four concurrent requests; a dataset card is shown only once everything (including CAR roots) is loaded, with a progress bar until then
 - Optional UnixFS directory tree inspection (CARv1 tail range requests with stream-scan fallback; CARv2 headers are supported for CAR roots)
 - Requests use timeouts; RPC calls retry transient failures, and starting a new search cancels outstanding loads
@@ -16,13 +17,14 @@ A static, client-side dashboard for the [Filecoin Onchain Cloud](https://docs.fi
 
 ## Run Locally
 
-Serve the project root with any static HTTP server. For example, with Python 3:
+Serve the project root with any static HTTP server, or use the bundled one:
 
 ```sh
-python -m http.server 8000
+npm install   # once, for the build and lint tooling
+npm run dev   # serves the project root on http://localhost:8000/
 ```
 
-Open <http://localhost:8000/>. The site uses native browser ES modules and requires no build step for development.
+Set `PORT` to change the port. Open <http://localhost:8000/>. The site uses native browser ES modules and requires no build step for development.
 
 ## Tests
 
@@ -32,12 +34,18 @@ Run the data-processing and formatting tests with Node.js:
 npm test
 ```
 
+The suite also verifies that every runtime dependency bundled from `esm.sh` is listed in `THIRD-PARTY-NOTICES.md` with a license and an upstream link, and that the pinned versions agree with `package.json`. Since the release build strips legal comments, that file is the only bundled-license record, so run the check on its own when touching dependencies:
+
+```sh
+npm run check:notices
+```
+
 ## Deployment
 
 Build a release with esbuild (requires `npm install` once):
 
 ```sh
-npm run release   # runs the tests, then the build
+npm run release   # runs the tests, the notices check, then the build
 npm run build     # build only
 ```
 
@@ -62,7 +70,8 @@ Project code is licensed under the [MIT License](LICENSE). Runtime dependencies 
 | Path | Responsibility |
 | --- | --- |
 | `index.html`, `css/styles.css` | Page markup and styles |
-| `js/app.js` | Entry point, lookup form, dataset loading |
+| `js/app.js` | Entry point, lookup form, network switch, load orchestration |
+| `js/results-ui.js` | Results panel: status messages, progress bar, card reveal order |
 | `js/account-ui.js` | Account balances and storage runway display |
 | `js/address-resolution.js` | Compose ENS and Filecoin address resolvers |
 | `js/ens.js` | Ethereum Mainnet ENS client |
@@ -74,6 +83,6 @@ Project code is licensed under the [MIT License](LICENSE). Runtime dependencies 
 | `js/car-queue.js` | DOM-free CAR root queue and progress |
 | `js/car.js` | CAR parsing and UnixFS tree inspection |
 | `js/ui-widgets.js` | Copy controls, download links, small helpers |
-| `js/constants.js`, `js/limits.js` | Chain configuration, ABIs, safety and request limits |
+| `js/constants.js`, `js/limits.js` | Chain configuration, ABIs, explorer URLs, safety and request limits |
 | `js/format.js` | Storage and token value formatting |
 | `tests/` | Data-processing, formatting, and UI-logic tests |

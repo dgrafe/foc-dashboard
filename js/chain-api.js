@@ -1,6 +1,7 @@
 import { decodeFunctionResult, encodeFunctionData } from "https://esm.sh/viem@2?bundle";
 import { getRail } from "https://esm.sh/@filoz/synapse-core@0.10.0/pay?bundle";
 import { PAGE_SIZE, DATASET_LOAD_CONCURRENCY, fwssAbi, pdpAbi, providerRegistryAbi } from "./constants.js";
+import { MAX_DATASETS, SECONDS_PER_DAY, PROVIDER_URL_CACHE_TTL_MS, PROVIDER_URL_CACHE_MAX_ENTRIES } from "./limits.js";
 import { hexToBytes } from "./car.js";
 import { formatUnitsRounded } from "./format.js";
 import { mapWithConcurrency } from "./concurrency.js";
@@ -16,12 +17,12 @@ export const { rpcRequest, rpcCall } = createRpc({
 
 export async function fetchAllDataSets(address) {
     const dataSets = [];
-    for (let offset = 0n; offset < 50000n; offset += PAGE_SIZE) {
+    for (let offset = 0n; offset < MAX_DATASETS; offset += PAGE_SIZE) {
         const page = await rpcCall(state.fwssView, fwssAbi, "getClientDataSets", [address, offset, PAGE_SIZE]);
         dataSets.push(...page);
         if (page.length < Number(PAGE_SIZE)) return dataSets;
     }
-    throw new Error("The account has more than 50,000 datasets; stopped for safety.");
+    throw new Error(`The account has more than ${MAX_DATASETS.toLocaleString("en-US")} datasets; stopped for safety.`);
 }
 
 export async function fetchPiecePage(dataSetId, cursor) {
@@ -38,14 +39,25 @@ export async function getDatasetFeatures(dataSetId) {
 
 const providerUrlCache = new Map();
 
+export function clearProviderCache() {
+    providerUrlCache.clear();
+}
+
 export function getProviderServiceUrl(providerId) {
     const key = `${state.chain.id}:${providerId}`;
-    if (!providerUrlCache.has(key)) {
-        const lookup = fetchProviderServiceUrl(providerId);
-        lookup.catch(() => providerUrlCache.delete(key));
-        providerUrlCache.set(key, lookup);
+    const cached = providerUrlCache.get(key);
+    if (cached && Date.now() - cached.createdAt < PROVIDER_URL_CACHE_TTL_MS) return cached.promise;
+    if (cached) providerUrlCache.delete(key);
+
+    const lookup = fetchProviderServiceUrl(providerId);
+    lookup.catch(() => providerUrlCache.delete(key));
+    providerUrlCache.set(key, { createdAt: Date.now(), promise: lookup });
+
+    // Keep the cache bounded; Map iteration order is insertion order, so the first key is the oldest.
+    while (providerUrlCache.size > PROVIDER_URL_CACHE_MAX_ENTRIES) {
+        providerUrlCache.delete(providerUrlCache.keys().next().value);
     }
-    return providerUrlCache.get(key);
+    return lookup;
 }
 
 async function fetchProviderServiceUrl(providerId) {
@@ -64,7 +76,7 @@ export async function calculateDatasetMonthlyCosts(dataSets) {
         if (dataSet.pdpEndEpoch > 0n) return { dataSetId: dataSet.dataSetId, label: "storage terminated", amount: 0n };
         try {
             const rail = await getRail(state.readClient, { railId: dataSet.pdpRailId });
-            const amount = rail.paymentRate * 86400n;
+            const amount = rail.paymentRate * SECONDS_PER_DAY;
             return { dataSetId: dataSet.dataSetId, label: `${formatUnitsRounded(amount, 18)} USDFC/mo`, amount };
         } catch (error) {
             console.warn(`Could not read Filecoin Pay rate for dataset ${dataSet.dataSetId}.`, error);

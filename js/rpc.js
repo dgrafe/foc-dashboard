@@ -13,6 +13,8 @@ export function createRpc({
     timeoutMs = RPC_TIMEOUT_MS,
     maxRetries = RPC_MAX_RETRIES,
     retryDelayMs = RPC_RETRY_BASE_DELAY_MS,
+    retryJitter = 0.5,
+    random = Math.random,
     sleep = sleepFor,
     getSignal = () => undefined
 }) {
@@ -45,7 +47,8 @@ export function createRpc({
                 return await attempt(method, params, signal);
             } catch (error) {
                 if (!(error instanceof RetryableError) || retry >= maxRetries || signal?.aborted) throw error;
-                await sleep(retryDelayMs * 3 ** retry);
+                // Jitter keeps parallel workers from retrying in lockstep after a shared 429.
+                await sleep(Math.round(retryDelayMs * 3 ** retry * (1 + random() * retryJitter)));
             }
         }
     }

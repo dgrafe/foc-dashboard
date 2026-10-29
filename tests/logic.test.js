@@ -17,8 +17,17 @@ test("duplicate copies can be limited while the total is still known", () => {
 });
 import { createRpc } from "../js/rpc.js";
 import { hexToBytes, parseCarRoots, parseContentRangeTotal, piecePayloadSizeFromBytes } from "../js/car.js";
-import { resolveLookupInput } from "../js/lookup.js";
+import { resolveLookupInput, isDirectAddressInput } from "../js/lookup.js";
 import { filecoinAddressToEthAddress } from "../js/filecoin-address.js";
+
+test("detects direct address input before ENS resolution runs", () => {
+    assert.equal(isDirectAddressInput("0x" + "a".repeat(40)), true);
+    assert.equal(isDirectAddressInput(`  ${"f410f" + "0".repeat(35)}  `), true);
+    assert.equal(isDirectAddressInput("t410f" + "0".repeat(35)), true);
+    assert.equal(isDirectAddressInput("alice.eth"), false);
+    assert.equal(isDirectAddressInput(""), false);
+    assert.equal(isDirectAddressInput("x0x" + "a".repeat(40)), false);
+});
 
 test("keeps direct FEVM address lookup and skips ENS resolution", async () => {
     const address = `0x${"a".repeat(40)}`;
@@ -209,10 +218,17 @@ test("retries transient failures and does not retry JSON-RPC errors", async () =
         if (calls === 1) throw new TypeError("network down");
         if (calls === 2) return jsonResponse({}, false, 503);
         return jsonResponse({ result: "0x2" });
-    }, { maxRetries: 2, retryDelayMs: 10, sleep: async (ms) => { delays.push(ms); } });
+    }, { maxRetries: 2, retryDelayMs: 10, random: () => 0, sleep: async (ms) => { delays.push(ms); } });
     assert.equal(await flaky.rpcRequest("m", []), "0x2");
     assert.equal(calls, 3);
     assert.deepEqual(delays, [10, 30]);
+
+    // Jitter only adds delay on top of the exponential base, so parallel retries desynchronise.
+    const jitterDelays = [];
+    const jittered = createTestRpc(async () => { throw new TypeError("network down"); },
+        { maxRetries: 1, retryDelayMs: 10, retryJitter: 0.5, random: () => 1, sleep: async (ms) => { jitterDelays.push(ms); } });
+    await assert.rejects(jittered.rpcRequest("m", []));
+    assert.deepEqual(jitterDelays, [15]);
 
     let reverts = 0;
     const revert = createTestRpc(async () => { reverts++; return jsonResponse({ error: { message: "revert" } }); }, { maxRetries: 2 });

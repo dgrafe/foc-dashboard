@@ -1,9 +1,13 @@
 import { calibration, mainnet } from "https://esm.sh/@filoz/synapse-core@0.10.0/chains?bundle";
-export { CAR_ROOT_LOAD_CONCURRENCY, MAX_UINT256, MAX_TREE_SCAN_BYTES, MAX_TREE_NODES, CAR_HEADER_RANGE_BYTES, CAR_TAIL_INITIAL_RANGE_BYTES, CAR_TAIL_RANGE_BYTES } from "./limits.js";
+export { CAR_ROOT_LOAD_CONCURRENCY, MAX_UINT256, MAX_TREE_SCAN_BYTES, MAX_TREE_NODES, CAR_HEADER_RANGE_BYTES, CAR_TAIL_INITIAL_RANGE_BYTES, CAR_TAIL_RANGE_BYTES, MAX_DATASETS, MAX_PIECES } from "./limits.js";
 export { calibration, mainnet };
 
 export const PAGE_SIZE = 100n;
 export const DATASET_LOAD_CONCURRENCY = 2;
+
+// Explorer bases; the active network segment is appended where the links are built.
+export const PAY_EXPLORER_URL = "https://pay.filecoin.cloud";
+export const PDP_EXPLORER_URL = "https://pdp.filecoin.cloud";
 
 export const dataSetComponents = [
             { name: "pdpRailId", type: "uint256" },

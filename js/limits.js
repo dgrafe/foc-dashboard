@@ -12,3 +12,20 @@ export const RPC_MAX_RETRIES = 2;
 export const RPC_RETRY_BASE_DELAY_MS = 300;
 export const MAX_DUPLICATE_LINKS = 5;
 export const PIECE_RENDER_CHUNK = 100;
+
+// Paging and safety limits for on-chain list reads.
+export const MAX_DATASETS = 50000n;
+export const MAX_PIECES = 50000;
+
+// Filecoin epochs: 30 second slots, so 2880 epochs per day and 120 per hour.
+export const EPOCH_SECONDS = 30;
+export const SECONDS_PER_DAY = 86400n;
+export const EPOCHS_PER_DAY = 2880n;
+export const EPOCHS_PER_HOUR = 120n;
+
+// Storage provider service URL cache.
+export const PROVIDER_URL_CACHE_TTL_MS = 5 * 60 * 1000;
+export const PROVIDER_URL_CACHE_MAX_ENTRIES = 500;
+
+// Pieces at or above this size get an explicit "large download" hint next to the download links.
+export const LARGE_DOWNLOAD_BYTES = 1024n * 1024n * 1024n;

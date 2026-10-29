@@ -4,11 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#f3f5ef">
+    <meta name="description" content="Look up FEVM addresses or ENS names to inspect Filecoin Warm Storage datasets, pieces, CAR roots, wallet balances and Filecoin Pay runway.">
     <title>Filecoin Onchain Cloud Dashboard</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="./css/styles.css">
 </head>
 <body>
     <main>
+        <noscript>
+            <p class="message error">This dashboard needs JavaScript to query Filecoin RPC endpoints. Enable JavaScript and reload the page.</p>
+        </noscript>
         <header>
             <p class="eyebrow">Filecoin Onchain Cloud</p>
             <h1>Hosted data overview.</h1>
@@ -68,9 +73,10 @@
             <p class="empty-state">Enter a FEVM address or ENS name to view its datasets and pieces.</p>
         </section>
 
-        <footer>Version 0.2.0 · <a href="https://github.com/dgrafe/foc-dashboard" target="_blank" rel="noopener noreferrer" title="Open the project on GitHub">GitHub</a></footer>
+        <footer><span id="app-version">Version …</span> · <a href="https://github.com/dgrafe/foc-dashboard" target="_blank" rel="noopener noreferrer" title="Open the project on GitHub">GitHub</a></footer>
     </main>
 
     <script type="module" src="./js/app.js"></script>
+    <script type="module" src="./js/version.js"></script>
 </body>
 </html>

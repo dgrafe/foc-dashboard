@@ -26,7 +26,7 @@ await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 
 const result = await build({
-  entryPoints: { app: path.join(root, "js/app.js"), styles: path.join(root, "css/styles.css") },
+  entryPoints: { app: path.join(root, "js/app.js"), styles: path.join(root, "css/styles.css"), version: path.join(root, "js/version.js") },
   outdir: dist,
   entryNames: "assets/[name]-[hash]",
   chunkNames: "assets/[name]-[hash]",
@@ -46,12 +46,21 @@ const find = (entry) =>
   "./" + path.relative(dist, path.resolve(outputs.find(([, o]) => o.entryPoint === entry)[0])).replaceAll("\\", "/");
 const jsFile = find("js/app.js");
 const cssFile = find("css/styles.css");
+const versionFile = find("js/version.js");
 
 let html = await readFile(path.join(root, "index.html"), "utf8");
-html = html.replace("./css/styles.css", cssFile).replace("./js/app.js", jsFile);
+const replacements = [
+  ["./css/styles.css", cssFile],
+  ["./js/app.js", jsFile],
+  ["./js/version.js", versionFile],
+];
+for (const [from, to] of replacements) {
+  if (!html.includes(from)) throw new Error(`index.html does not reference ${from}; the build would emit broken asset paths.`);
+  html = html.replace(from, to);
+}
 await writeFile(path.join(dist, "index.html"), html);
 
-for (const file of ["LICENSE", "THIRD-PARTY-NOTICES.md"]) {
+for (const file of ["LICENSE", "THIRD-PARTY-NOTICES.md", "favicon.svg"]) {
   await cp(path.join(root, file), path.join(dist, file));
 }
 console.log("Release build written to dist/");

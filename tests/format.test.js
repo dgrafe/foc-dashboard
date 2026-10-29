@@ -1,12 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatBytes, formatStorageHorizon, formatUnits, formatUnitsFixed, formatUnitsRounded } from "../js/format.js";
-import { MAX_UINT256 } from "../js/limits.js";
+import { formatBytes, formatStorageHorizon, formatUnits, formatUnitsFixed, formatUnitsRounded, isLargeDownload } from "../js/format.js";
+import { MAX_UINT256, LARGE_DOWNLOAD_BYTES } from "../js/limits.js";
 
 test("formats byte sizes using binary units", () => {
     assert.equal(formatBytes(0n), "0 B");
     assert.equal(formatBytes(1024n), "1.00 KiB");
     assert.equal(formatBytes(1536n), "1.50 KiB");
+});
+
+test("warns about large downloads only at or above the threshold", () => {
+    assert.equal(isLargeDownload(LARGE_DOWNLOAD_BYTES - 1n), false);
+    assert.equal(isLargeDownload(LARGE_DOWNLOAD_BYTES), true);
+    assert.equal(isLargeDownload(LARGE_DOWNLOAD_BYTES * 8n), true);
+    assert.equal(isLargeDownload(null), false);
+    assert.equal(LARGE_DOWNLOAD_BYTES, 1024n ** 3n);
 });
 
 test("formats token units with locale decimals and truncation", () => {

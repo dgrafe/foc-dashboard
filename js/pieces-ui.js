@@ -1,6 +1,6 @@
 import { CAR_ROOT_LOAD_CONCURRENCY } from "./constants.js";
 import { fetchCarRoots, fetchUnixFsFileTree, renderUnixFsTree } from "./car.js";
-import { formatBytes } from "./format.js";
+import { formatBytes, isLargeDownload } from "./format.js";
 import { countDuplicateCopies, getDuplicateCopies } from "./piece-index.js";
 import { MAX_DUPLICATE_LINKS, PIECE_RENDER_CHUNK } from "./limits.js";
 import { getChunkRange, renderedCountForIndex } from "./chunks.js";
@@ -153,6 +153,16 @@ function releaseFileTreeWaiter(piece) {
     if (piece.fileTreeWaiters === 0 && !piece.fileTree) piece.fileTreeController?.abort(new Error("File tree loading cancelled."));
 }
 
+// Downloading a CAR means pulling the whole piece, so warn once it gets large.
+function createDownloadSizeHint(size) {
+    if (!isLargeDownload(size)) return null;
+    const hint = document.createElement("span");
+    hint.className = "download-size-hint";
+    hint.textContent = `Large CAR · ${formatBytes(size)}`;
+    hint.title = `This download is a CAR file of about ${formatBytes(size)}. Check your connection and available disk space before starting.`;
+    return hint;
+}
+
 function createPieceRow(piece, index, providerUrl, cdnUrl, providerServiceUrl, cdnEnabled, indexedPiece) {
     const element = document.createElement("div");
     element.className = "piece";
@@ -185,7 +195,11 @@ function createPieceRow(piece, index, providerUrl, cdnUrl, providerServiceUrl, c
     if (cdnUrl) downloads.appendChild(createDownloadLink(cdnUrl, "Download from CDN", "CDN"));
     if (providerUrl) downloads.appendChild(createDownloadLink(providerUrl, "Download from storage provider", "Provider"));
     linksLine.appendChild(cid);
-    if (downloads.childElementCount > 0) linksLine.appendChild(downloads);
+    if (downloads.childElementCount > 0) {
+        const sizeHint = createDownloadSizeHint(piece.size);
+        if (sizeHint) downloads.appendChild(sizeHint);
+        linksLine.appendChild(downloads);
+    }
     identity.append(heading, linksLine);
 
     const result = document.createElement("div");
