@@ -14,6 +14,7 @@ A static, client-side dashboard for the [Filecoin Onchain Cloud](https://docs.fi
 - Optional UnixFS directory tree inspection (CARv1 tail range requests with stream-scan fallback; CARv2 headers are supported for CAR roots)
 - Requests use timeouts; RPC calls retry transient failures, and starting a new search cancels outstanding loads
 - Read-only public RPC calls; no wallet connection required
+- Interface in English, German, Spanish, French and Chinese (Simplified); the language is detected from the browser, can be switched in the footer and applies live to all content, including loaded results and values
 
 ## Run Locally
 
@@ -39,6 +40,8 @@ The suite also verifies that every runtime dependency bundled from `esm.sh` is l
 ```sh
 npm run check:notices
 ```
+
+The i18n tests keep the translation dictionary in sync: every key used in `index.html` or in a `t("…")` call must exist in all five locales (en, de, es, fr, zh), every dictionary key must be used somewhere, and the tests expect English output regardless of the system locale (the app otherwise auto-detects the browser language). Low-level protocol and CAR parse error details (RPC errors, HTTP status texts, CBOR/varint messages) are deliberately left in English and surface inside translated messages.
 
 ## Deployment
 
@@ -84,5 +87,6 @@ Project code is licensed under the [MIT License](LICENSE). Runtime dependencies 
 | `js/car.js` | CAR parsing and UnixFS tree inspection |
 | `js/ui-widgets.js` | Copy controls, download links, small helpers |
 | `js/constants.js`, `js/limits.js` | Chain configuration, ABIs, explorer URLs, safety and request limits |
+| `js/i18n.js`, `js/i18n-ui.js` | Translation dictionary and language state; DOM bindings, static markup translation and language selector |
 | `js/format.js` | Storage and token value formatting |
 | `tests/` | Data-processing, formatting, and UI-logic tests |

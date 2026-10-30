@@ -1,6 +1,8 @@
+import { t, translatedError } from "./i18n.js";
+
 export function filecoinAddressToEthAddress(value, base32, blake2b) {
     const match = /^([ft])410f([a-z2-7]+)$/i.exec(value.trim());
-    if (!match) throw new Error("Enter a valid f410 or t410 Filecoin address.");
+    if (!match) throw translatedError(() => t("lookup.invalidFilecoinAddress"));
 
     try {
         const addressBytes = base32.decode(`b${match[2].toLowerCase()}`);
@@ -15,6 +17,6 @@ export function filecoinAddressToEthAddress(value, base32, blake2b) {
 
         return `0x${Array.from(subaddress, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
     } catch {
-        throw new Error("Enter a valid f410 or t410 Filecoin address.");
+            throw translatedError(() => t("lookup.invalidFilecoinAddress"));
     }
 }

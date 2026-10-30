@@ -1,3 +1,6 @@
+import { t } from "./i18n.js";
+import { bindText, bindAttr } from "./i18n-ui.js";
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function createIconSvg() {
@@ -18,12 +21,12 @@ function createSvgPath(d) {
     return path;
 }
 
-export function createHashCopyControl(hash, label) {
+export function createHashCopyControl(hash, labelRender) {
     const button = document.createElement("button");
     button.className = "copy-hash-button";
     button.type = "button";
-    button.setAttribute("aria-label", label);
-    button.title = label;
+    bindAttr(button, "aria-label", labelRender);
+    bindAttr(button, "title", labelRender);
 
     const icon = createIconSvg();
     const frontSheet = document.createElementNS(SVG_NS, "rect");
@@ -43,15 +46,15 @@ export function createHashCopyControl(hash, label) {
     return { button, status };
 }
 
-export function createDownloadLink(url, label, source, iconText = "download") {
+export function createDownloadLink(url, labelRender, sourceRender, iconText = "download", variant = "") {
     const link = document.createElement("a");
     link.className = "download-icon";
-    if (source === "Provider") link.classList.add("download-provider");
+    if (variant === "provider") link.classList.add("download-provider");
     link.href = url;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.setAttribute("aria-label", label);
-    link.title = label;
+    bindAttr(link, "aria-label", labelRender);
+    bindAttr(link, "title", labelRender);
     const icon = document.createElement("span");
     icon.setAttribute("aria-hidden", "true");
     if (iconText === "external") {
@@ -67,7 +70,7 @@ export function createDownloadLink(url, label, source, iconText = "download") {
     }
     const sourceLabel = document.createElement("span");
     sourceLabel.className = "download-source";
-    sourceLabel.textContent = source;
+    bindText(sourceLabel, sourceRender);
     link.append(icon, sourceLabel);
     return link;
 }
@@ -87,10 +90,10 @@ export async function copyPieceCid(cid, status) {
             field.remove();
             if (!copied) throw new Error("Clipboard unavailable");
         }
-        status.textContent = "Copied";
+        status.textContent = t("ui.copied");
         setTimeout(() => { status.textContent = ""; }, 1800);
     } catch {
-        status.textContent = "Could not copy";
+        status.textContent = t("ui.copyFailed");
     }
 }
 
@@ -104,17 +107,17 @@ export function keepLinkInteractive(link) {
     return link;
 }
 
-export function addEmptyPieces(container, message) {
+export function addEmptyPieces(container, render) {
     const line = document.createElement("p");
     line.className = "piece-result pending";
-    line.textContent = message;
+    bindText(line, render);
     container.appendChild(line);
 }
 
-export function setResult(container, message, kind) {
+export function setResult(container, render, kind) {
     container.replaceChildren();
     const text = document.createElement("span");
     text.className = kind;
-    text.textContent = message;
+    bindText(text, render);
     container.appendChild(text);
 }

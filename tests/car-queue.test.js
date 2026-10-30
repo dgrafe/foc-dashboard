@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { setLanguage } from "../js/i18n.js";
 import { createCarRootQueue } from "../js/car-queue.js";
+
+// Status and failure texts are translated; these assertions expect English.
+setLanguage("en");
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 

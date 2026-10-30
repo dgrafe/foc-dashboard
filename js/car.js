@@ -1,4 +1,5 @@
 import { MAX_TREE_SCAN_BYTES, MAX_TREE_NODES, CAR_HEADER_RANGE_BYTES, CAR_TAIL_INITIAL_RANGE_BYTES, CAR_TAIL_RANGE_BYTES, CAR_RANGE_TIMEOUT_MS, CAR_STREAM_TIMEOUT_MS } from "./limits.js";
+import { t, errorText } from "./i18n.js";
 import { formatBytes } from "./format.js";
 import { fetchWithTimeout } from "./fetch-timeout.js";
 
@@ -10,21 +11,29 @@ export async function fetchUnixFsFileTree(piece, signal) {
         if (source.providerUrl && !attempted.has(source.providerUrl)) {
             attempted.add(source.providerUrl);
             try {
-                return { source: "Storage provider", ...await scanUnixFsCar(source.providerUrl, piece.size, signal) };
+                // The raw source key is stored so the label can be translated at render time.
+                return { source: "provider", ...await scanUnixFsCar(source.providerUrl, piece.size, signal) };
             } catch (error) {
-                errors.push(`Provider: ${error.message}`);
+                errors.push(`${t("car.providerSource")}: ${errorText(error)}`);
             }
         }
         if (source.cdnUrl && !attempted.has(source.cdnUrl)) {
             attempted.add(source.cdnUrl);
             try {
-                return { source: "FilBeam", ...await scanUnixFsCar(source.cdnUrl, piece.size, signal) };
+                return { source: "cdn", ...await scanUnixFsCar(source.cdnUrl, piece.size, signal) };
             } catch (error) {
-                errors.push(`FilBeam: ${error.message}`);
+                errors.push(`FilBeam: ${errorText(error)}`);
             }
         }
     }
-    throw new Error(errors.join("; ") || "No provider or CDN endpoint is available.");
+    throw new Error(errors.join("; ") || t("car.noSources"));
+}
+
+// Source keys are translated at render time so a loaded tree follows a language switch.
+export function unixFsSourceLabel(tree) {
+    if (tree.source === "provider") return t("car.providerSource");
+    if (tree.source === "cdn") return "FilBeam";
+    return String(tree.source);
 }
 
 function fetchRange(url, range, signal) {
@@ -229,7 +238,7 @@ async function* boundedCarStream(body, maximumBytes) {
             if (done) return;
             totalBytes += value.byteLength;
             if (totalBytes > maximumBytes) {
-                throw new Error(`CAR scan exceeds ${formatBytes(BigInt(maximumBytes))}; display stopped for safety.`);
+                throw new Error(t("car.scanExceeded", { size: formatBytes(BigInt(maximumBytes)) }));
             }
             yield value;
         }
@@ -239,11 +248,11 @@ async function* boundedCarStream(body, maximumBytes) {
 }
 
 async function scanUnixFsCarStream(response, CarBlockIterator, UnixFS, dagPb, legacyUnixFS) {
-    if (!response.body) throw new Error("The browser cannot read the CAR stream.");
+    if (!response.body) throw new Error(t("car.noCarStream"));
     const iterator = await CarBlockIterator.fromIterable(boundedCarStream(response.body, MAX_TREE_SCAN_BYTES));
-    if (iterator.version !== 1 && iterator.version !== 2) throw new Error("Only CARv1 and CARv2 are supported.");
+    if (iterator.version !== 1 && iterator.version !== 2) throw new Error(t("car.onlyCarV1V2"));
     const roots = await iterator.getRoots();
-    if (roots.length === 0) throw new Error("CAR contains no root CID.");
+    if (roots.length === 0) throw new Error(t("car.noRoot"));
     const state = createUnixFsState(roots);
     if (state.pending.size > 0) {
         for await (const block of iterator) {
@@ -273,7 +282,7 @@ function processUnixFsBlock(state, block, UnixFS, dagPb, legacyUnixFS) {
     if (!state.pending.has(key)) return;
     state.pending.delete(key);
     state.scannedNodes++;
-    if (state.scannedNodes > MAX_TREE_NODES) throw new Error(`UnixFS tree exceeds ${MAX_TREE_NODES} nodes.`);
+    if (state.scannedNodes > MAX_TREE_NODES) throw new Error(t("car.tooManyNodes", { count: MAX_TREE_NODES }));
 
     const record = decodeUnixFsBlock(block.bytes, UnixFS, dagPb, legacyUnixFS);
     state.records.set(key, record);
@@ -348,7 +357,9 @@ export function renderUnixFsTree(container, tree) {
     container.replaceChildren();
     const source = document.createElement("div");
     source.className = "piece-id";
-    source.textContent = `UnixFS · ${tree.source} · ${tree.scannedNodes} nodes read`;
+    source.textContent = tree.scannedNodes === 1
+        ? t("tree.summaryOne", { source: unixFsSourceLabel(tree), count: tree.scannedNodes })
+        : t("tree.summary", { source: unixFsSourceLabel(tree), count: tree.scannedNodes });
     container.appendChild(source);
 
     const list = document.createElement("ul");
@@ -363,13 +374,13 @@ export function renderUnixFsTree(container, tree) {
             const disclosure = document.createElement("details");
             disclosure.open = depth === 0;
             const heading = document.createElement("summary");
-            heading.textContent = `${name}/ · Directory`;
+            heading.textContent = t("tree.dirEntry", { name });
             disclosure.appendChild(heading);
             if (record.entries.length) {
                 if (depth >= 40 || ancestors.has(key)) {
                     const limit = document.createElement("div");
                     limit.className = "filesystem-kind";
-                    limit.textContent = "Deeper levels are not shown.";
+                    limit.textContent = t("tree.depthLimit");
                     disclosure.appendChild(limit);
                 } else {
                     const nextAncestors = new Set(ancestors);
@@ -389,9 +400,17 @@ export function renderUnixFsTree(container, tree) {
         item.appendChild(label);
         const type = document.createElement("span");
         type.className = "filesystem-kind";
-        const labels = { directory: "Directory", file: "File", entry: "UnixFS entry", symlink: "Symlink", metadata: "Metadata", missing: "Block missing from CAR", unsupported: "Unrecognized UnixFS type" };
+        const labels = {
+            directory: t("tree.kindDirectory"),
+            file: t("tree.kindFile"),
+            entry: t("tree.kindEntry"),
+            symlink: t("tree.kindSymlink"),
+            metadata: t("tree.kindMetadata"),
+            missing: t("tree.kindMissing"),
+            unsupported: t("tree.kindUnsupported")
+        };
         type.textContent = kind === "file" && record?.fileSize != null
-            ? ` · File · ${formatBytes(BigInt(record.fileSize))}`
+            ? t("tree.fileEntry", { size: formatBytes(BigInt(record.fileSize)) })
             : ` · ${labels[kind]}`;
         item.appendChild(type);
         parent.appendChild(item);
@@ -399,8 +418,8 @@ export function renderUnixFsTree(container, tree) {
     tree.roots.forEach((cid, index) => {
         const rootRecord = tree.records.get(cid.toString());
         const name = tree.roots.length === 1
-            ? rootRecord?.kind === "directory" ? "Root" : rootRecord?.kind === "file" ? "Root file" : "/"
-            : `Root ${index + 1}`;
+            ? rootRecord?.kind === "directory" ? t("tree.root") : rootRecord?.kind === "file" ? t("tree.rootFile") : "/"
+            : t("tree.rootNumber", { number: index + 1 });
         renderEntry(list, cid, name, 0, new Set());
     });
     container.appendChild(list);
@@ -415,7 +434,7 @@ export async function fetchCarRoots(url, signal) {
 }
 
 async function readAtMost(response, maxBytes) {
-    if (!response.body) throw new Error("The browser cannot read the piece stream.");
+    if (!response.body) throw new Error(t("car.noPieceStream"));
     const reader = response.body.getReader();
     const chunks = [];
     let total = 0;

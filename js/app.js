@@ -1,4 +1,6 @@
 import { calibration, mainnet, DATASET_LOAD_CONCURRENCY } from "./constants.js";
+import { t, errorText, onLanguageChange } from "./i18n.js";
+import { initI18n, bindText } from "./i18n-ui.js";
 import { mapWithConcurrency } from "./concurrency.js";
 import { state, configureNetwork, getNetworkName, startSearch } from "./state.js";
 import { calculateDatasetMonthlyCosts, clearProviderCache, fetchAllDataSets } from "./chain-api.js";
@@ -8,6 +10,8 @@ import { createResultsPanel, showMessage } from "./results-ui.js";
 import { hideAccountOverview, loadBalances } from "./account-ui.js";
 import { resolveAddressInput } from "./address-resolution.js";
 import { isDirectAddressInput } from "./lookup.js";
+
+initI18n();
 
 const form = document.getElementById("lookupForm");
 const addressInput = document.getElementById("walletAddress");
@@ -19,7 +23,32 @@ form.addEventListener("submit", (event) => {
     loadDatasets();
 });
 
-addressInput.addEventListener("input", () => addressInput.setCustomValidity(""));
+addressInput.addEventListener("input", () => setInputError(null));
+
+// Keeps the native validation bubble in sync with the language while an error is shown.
+let inputErrorRender = null;
+function setInputError(render) {
+    inputErrorRender = render;
+    addressInput.setCustomValidity(render ? render() : "");
+}
+
+// Button label follows the lookup state; the binding re-translates it on a language change.
+let buttonState = "idle"; // "idle" | "ens" | "loading"
+const repaintButton = bindText(fetchButton, () => {
+    if (buttonState === "ens") return t("app.resolvingEns");
+    if (buttonState === "loading") return t("app.loadingData");
+    return t("form.fetchBtn");
+});
+
+// Re-applies a pending input error in the new language.
+onLanguageChange(() => {
+    if (inputErrorRender) addressInput.setCustomValidity(inputErrorRender());
+});
+
+function setButtonState(next) {
+    buttonState = next;
+    repaintButton();
+}
 
 function getSelectedChain() {
     return networkOptions.find((option) => option.checked)?.value === "calibration" ? calibration : mainnet;
@@ -28,19 +57,19 @@ function getSelectedChain() {
 async function loadDatasets() {
     const lookupInput = addressInput.value.trim();
     const isAddressInput = isDirectAddressInput(lookupInput);
-    addressInput.setCustomValidity("");
+    setInputError(null);
     const isStale = startSearch();
     carQueue.clear();
     rowRegistry.clear();
     clearProviderCache();
     hideAccountOverview();
     fetchButton.disabled = true;
-    fetchButton.textContent = isAddressInput ? "Loading data …" : "Resolving ENS …";
+    setButtonState(isAddressInput ? "loading" : "ens");
     networkOptions.forEach((option) => { option.disabled = true; });
     results.setAttribute("aria-busy", "true");
-    showMessage(results, isAddressInput
-        ? "Preparing address lookup …"
-        : `Resolving ${lookupInput || "ENS name"} on Ethereum Mainnet …`);
+    showMessage(results, () => isAddressInput
+        ? t("app.preparing")
+        : t("app.resolvingName", { name: lookupInput || t("app.ensName") }));
 
     try {
         let address;
@@ -48,23 +77,23 @@ async function loadDatasets() {
             address = await resolveAddressInput(lookupInput);
         } catch (error) {
             if (!isStale()) {
-                addressInput.setCustomValidity(error.message);
+                setInputError(() => errorText(error));
                 addressInput.reportValidity();
-                showMessage(results, error.message, { isError: true });
+                showMessage(results, () => errorText(error), { isError: true });
             }
             return;
         }
         if (isStale()) return;
 
-        addressInput.setCustomValidity("");
+        setInputError(null);
         configureNetwork(getSelectedChain());
-        fetchButton.textContent = "Loading data …";
-        showMessage(results, `Reading datasets from ${getNetworkName(state.chain)} and loading piece lists …`);
+        setButtonState("loading");
+        showMessage(results, () => t("app.readingDatasets", { network: getNetworkName(state.chain) }));
 
         const dataSets = await fetchAllDataSets(address);
         if (isStale()) return;
         if (dataSets.length === 0) {
-            showMessage(results, "No FWSS datasets were found for this address.");
+            showMessage(results, () => t("app.noDatasets"));
             return;
         }
         loadBalances(address, () =>
@@ -82,11 +111,11 @@ async function loadDatasets() {
             }
         });
     } catch (error) {
-        if (!isStale()) showMessage(results, `Request failed: ${error.message}. Check the RPC connection or whether the provider allows browser requests (CORS).`, { isError: true });
+        if (!isStale()) showMessage(results, () => t("app.requestFailed", { error: errorText(error) }), { isError: true });
     } finally {
         if (!isStale()) {
             fetchButton.disabled = false;
-            fetchButton.textContent = "Look up address or ENS";
+            setButtonState("idle");
             networkOptions.forEach((option) => { option.disabled = false; });
             results.setAttribute("aria-busy", "false");
         }

@@ -153,8 +153,8 @@
         .piece-links { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
         .piece-downloads { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-left: auto; }
         .piece-downloads a, .piece-root-links a.download-icon { display: inline-flex; min-width: 28px; height: 20px; align-items: center; justify-content: center; gap: 5px; padding: 0 7px; border: 1px solid var(--line); border-radius: 4px; color: var(--green-dark); font-size: 17px; line-height: 1; text-decoration: none; }
-        .piece-downloads a.download-provider { width: 73px; flex: 0 0 73px; }
-        .piece-root-links a.download-icon { width: 77px; flex: 0 0 77px; }
+        .piece-downloads a.download-provider { min-width: 73px; }
+        .piece-root-links a.download-icon { min-width: 77px; }
         .download-icon svg { width: 12px; height: 12px; }
         .download-source { color: var(--muted); font-size: 9px; font-weight: 750; text-transform: uppercase; white-space: nowrap; }
         .piece-root-links .download-source { text-transform: none; }
@@ -181,6 +181,8 @@
         footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.6; }
         footer a { color: var(--green-dark); text-underline-offset: 2px; }
         footer a:hover { color: var(--ink); }
+        .language-switch { margin-left: 12px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--white); color: var(--ink); font: inherit; cursor: pointer; }
+        .language-switch:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 
         @keyframes arrive { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         @media (max-width: 620px) {

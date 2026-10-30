@@ -1,7 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { setLanguage } from "../js/i18n.js";
 import { formatBytes, formatStorageHorizon, formatUnits, formatUnitsFixed, formatUnitsRounded, isLargeDownload } from "../js/format.js";
-import { MAX_UINT256, LARGE_DOWNLOAD_BYTES } from "../js/limits.js";
+import { MAX_UINT256, EPOCHS_PER_DAY, EPOCHS_PER_HOUR, EPOCH_SECONDS, LARGE_DOWNLOAD_BYTES } from "../js/limits.js";
+
+// The formatting output is language-dependent; these assertions expect English.
+setLanguage("en");
+
+// Mirrors the date part of formatStorageHorizon so the assertions stay time-independent.
+const dateLabel = (epochs) => new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
+    .format(new Date(Date.now() + Number(epochs) * EPOCH_SECONDS * 1000));
 
 test("formats byte sizes using binary units", () => {
     assert.equal(formatBytes(0n), "0 B");
@@ -36,4 +44,10 @@ test("formats storage runway boundary states", () => {
     assert.equal(formatStorageHorizon(0n, 1n), "0 days · top-up required");
     assert.equal(formatStorageHorizon(10n, 1n, 1n), "In deficit · top-up required");
     assert.equal(formatStorageHorizon(BigInt(Number.MAX_SAFE_INTEGER) + 1n, 1n), "Very long runway");
+});
+
+test("uses singular duration units for exactly one day or hour", () => {
+    assert.equal(formatStorageHorizon(EPOCHS_PER_DAY, 1n), `1 day 0 hr · until approx. ${dateLabel(EPOCHS_PER_DAY)}`);
+    assert.equal(formatStorageHorizon(EPOCHS_PER_HOUR, 1n), `1 hr · until approx. ${dateLabel(EPOCHS_PER_HOUR)}`);
+    assert.equal(formatStorageHorizon(EPOCHS_PER_HOUR * 2n, 1n), `2 hr · until approx. ${dateLabel(EPOCHS_PER_HOUR * 2n)}`);
 });

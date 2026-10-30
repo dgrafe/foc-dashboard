@@ -1,10 +1,12 @@
 // Results panel rendering: status messages, the dataset panel shell, load progress and card reveal order.
+import { t } from "./i18n.js";
+import { bindText, bindAttr } from "./i18n-ui.js";
 import { createDatasetCard } from "./datasets-ui.js";
 
-export function showMessage(container, message, { isError = false } = {}) {
+export function showMessage(container, render, { isError = false } = {}) {
     const box = document.createElement("p");
     box.className = isError ? "message error" : "message";
-    box.textContent = message;
+    bindText(box, render);
     container.replaceChildren(box);
 }
 
@@ -15,12 +17,14 @@ export function createResultsPanel(container, dataSets, carQueue) {
     const summary = document.createElement("div");
     summary.className = "summary";
     const heading = document.createElement("h2");
-    heading.textContent = "Stored datasets";
+    bindText(heading, () => t("results.storedDatasets"));
     const count = document.createElement("span");
-    const totalLabel = `${dataSets.length} ${dataSets.length === 1 ? "Dataset" : "Datasets"}`;
+    const totalLabel = () => (dataSets.length === 1
+        ? t("results.datasetsOne", { count: dataSets.length })
+        : t("results.datasetsMany", { count: dataSets.length }));
     const progressBar = document.createElement("progress");
     progressBar.className = "load-progress";
-    progressBar.setAttribute("aria-label", "Loading datasets and CAR roots");
+    bindAttr(progressBar, "aria-label", () => t("results.progressLabel"));
     summary.append(heading, count);
     panel.append(summary, progressBar);
     container.replaceChildren(panel);
@@ -37,17 +41,22 @@ export function createResultsPanel(container, dataSets, carQueue) {
         }
     };
 
-    carQueue.setProgressListener(({ cardsDone, cardsTotal, rootsDone, rootsTotal }) => {
+    const repaintCount = bindText(count, () => {
+        if (finished) return totalLabel();
+        const { cardsDone, cardsTotal, rootsDone, rootsTotal } = carQueue.progress;
+        return t("results.progress", { label: totalLabel(), ready: cardsDone, total: cardsTotal, rootsDone, rootsTotal });
+    });
+
+    carQueue.setProgressListener((progress) => {
         if (finished) return;
-        if (cardsDone === cardsTotal) {
-            finished = true;
-            count.textContent = totalLabel;
+        if (progress.cardsDone === progress.cardsTotal) finished = true;
+        repaintCount();
+        if (finished) {
             progressBar.remove();
             return;
         }
-        count.textContent = `${totalLabel} · loading ${cardsDone}/${cardsTotal} ready · CAR roots ${rootsDone}/${rootsTotal}`;
-        progressBar.max = cardsTotal + rootsTotal;
-        progressBar.value = cardsDone + rootsDone;
+        progressBar.max = progress.cardsTotal + progress.rootsTotal;
+        progressBar.value = progress.cardsDone + progress.rootsDone;
     });
     carQueue.resetProgress(cards.length);
 

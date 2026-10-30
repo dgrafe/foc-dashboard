@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseCarRoots, pieceBytesToCid, piecePayloadSizeFromBytes } from "../js/car.js";
+import { setLanguage } from "../js/i18n.js";
+
+// Error texts can be translated; these assertions expect English.
+setLanguage("en");
 
 const ZERO_SHA256_CID_BYTES = [1, 0x55, 0x12, 0x20, ...Array(32).fill(0)];
 const ZERO_SHA256_CID = "bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

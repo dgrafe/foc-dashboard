@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import { encodeFunctionData, decodeFunctionResult, encodeFunctionResult } from "viem";
 import { base32 } from "multiformats/bases/base32";
 import { blake2b } from "@noble/hashes/blake2b";
+import { setLanguage } from "../js/i18n.js";
 import { addPieceToIndex, countDuplicateCopies, getDuplicateCopies } from "../js/piece-index.js";
+
+// Error texts and copy labels are translated; these assertions expect English.
+setLanguage("en");
 
 test("duplicate copies can be limited while the total is still known", () => {
     const index = new Map();
@@ -60,6 +64,21 @@ test("rejects malformed or checksum-invalid Filecoin EVM addresses", () => {
     const resolver = (value) => filecoinAddressToEthAddress(value, base32, blake2b);
     assert.throws(() => resolver("f410fnot-an-address"), /valid f410 or t410 Filecoin address/);
     assert.throws(() => resolver("f410f2oekwcmo2pueydmaq53eic2i62crtbeyuzx2gnx"), /valid f410 or t410 Filecoin address/);
+});
+
+test("Filecoin address errors carry a re-translatable render function", () => {
+    const resolver = (value) => filecoinAddressToEthAddress(value, base32, blake2b);
+    let error;
+    try {
+        resolver("f410fnot-an-address");
+    } catch (caught) {
+        error = caught;
+    }
+    assert.equal(typeof error.messageRender, "function");
+    assert.equal(error.message, error.messageRender());
+    setLanguage("de");
+    assert.match(error.messageRender(), /f410- oder t410-Filecoin-Adresse/);
+    setLanguage("en");
 });
 
 test("rejects malformed direct addresses and ENS names without addresses", async () => {

@@ -1,4 +1,6 @@
 import { CAR_ROOT_LOAD_CONCURRENCY } from "./constants.js";
+import { t, errorText } from "./i18n.js";
+import { bindText, bindAttr, bindDom } from "./i18n-ui.js";
 import { fetchCarRoots, fetchUnixFsFileTree, renderUnixFsTree } from "./car.js";
 import { formatBytes, isLargeDownload } from "./format.js";
 import { countDuplicateCopies, getDuplicateCopies } from "./piece-index.js";
@@ -12,11 +14,21 @@ import { createDownloadLink, createHashCopyControl, setResult } from "./ui-widge
 export const rowRegistry = new Map();
 
 export function paintRootState(rootState) {
+    if (!rootState.container) return;
+    // One binding per root state; it re-renders on every state change and language change.
+    if (!rootState.repaint) rootState.repaint = bindDom(rootState.container, () => renderRootContent(rootState));
+    else rootState.repaint();
+}
+
+function renderRootContent(rootState) {
     const container = rootState.container;
-    if (!container) return;
-    if (rootState.status === "roots") renderCarRoots(container, rootState.roots, rootState.source);
-    else if (rootState.status === "failure") setResult(container, rootState.message, "failure");
-    else container.textContent = "Reading CAR header …";
+    if (rootState.status === "roots") {
+        renderCarRoots(container, rootState.roots, () => rootState.sourceRender ? rootState.sourceRender() : rootState.source);
+    } else if (rootState.status === "failure") {
+        setResult(container, () => rootState.messageRender ? rootState.messageRender() : rootState.message, "failure");
+    } else {
+        container.textContent = t("piece.readingHeader");
+    }
 }
 
 export const carQueue = createCarRootQueue({
@@ -49,11 +61,11 @@ function updateMoreBar(card, remaining) {
     if (remaining === 0) return;
     const next = document.createElement("button");
     next.type = "button";
-    next.textContent = `Show next ${Math.min(PIECE_RENDER_CHUNK, remaining)} (${remaining} more)`;
+    bindText(next, () => t("piece.showNext", { count: Math.min(PIECE_RENDER_CHUNK, remaining), remaining }));
     next.addEventListener("click", () => renderMoreRows(card, PIECE_RENDER_CHUNK));
     const all = document.createElement("button");
     all.type = "button";
-    all.textContent = "Show all";
+    bindText(all, () => t("piece.showAll"));
     all.addEventListener("click", () => renderMoreRows(card, card.rows.length));
     card.moreBar.append(next, all);
 }
@@ -73,11 +85,19 @@ export function updatePieceDuplicateReferences(indexedPiece) {
 
 function renderDuplicateReference(indexedPiece, occurrence) {
     if (indexedPiece.datasets.length < 2 || !occurrence.duplicateReference) return;
+    if (!occurrence.repaintDuplicates) {
+        occurrence.repaintDuplicates = bindDom(occurrence.duplicateReference, (el) => renderDuplicatesInto(el, indexedPiece, occurrence));
+    } else {
+        occurrence.repaintDuplicates();
+    }
+}
+
+function renderDuplicatesInto(container, indexedPiece, occurrence) {
     const copies = getDuplicateCopies(indexedPiece, occurrence, MAX_DUPLICATE_LINKS);
     const hiddenCount = countDuplicateCopies(indexedPiece) - copies.length;
-    occurrence.duplicateReference.replaceChildren(document.createTextNode(`${copies.length + hiddenCount === 1 ? "Copy" : "Copies"} in `));
+    container.replaceChildren(document.createTextNode(copies.length + hiddenCount === 1 ? t("piece.copyInLabel") : t("piece.copiesInLabel")));
     copies.forEach((copy, index) => {
-        if (index > 0) occurrence.duplicateReference.append(document.createTextNode("; "));
+        if (index > 0) container.append(document.createTextNode("; "));
         const link = document.createElement("a");
         link.href = `#${copy.targetId}`;
         link.textContent = copy.label;
@@ -89,34 +109,52 @@ function renderDuplicateReference(indexedPiece, occurrence) {
             if (targetDataset) targetDataset.open = true;
             requestAnimationFrame(() => target.scrollIntoView({ behavior: "smooth", block: "center" }));
         });
-        occurrence.duplicateReference.appendChild(link);
+        container.appendChild(link);
     });
-    if (hiddenCount > 0) occurrence.duplicateReference.append(document.createTextNode(` (+${hiddenCount} more)`));
-    occurrence.duplicateReference.hidden = false;
+    if (hiddenCount > 0) container.append(document.createTextNode(` ${t("piece.moreCopies", { count: hiddenCount })}`));
+    container.hidden = false;
 }
 
 function createFileTreeDetails(piece) {
     const details = document.createElement("details");
     details.className = "filesystem";
     const summary = document.createElement("summary");
-    summary.textContent = "Load UnixFS file tree";
+    bindText(summary, () => t("piece.fileTreeSummary"));
     const content = document.createElement("div");
     content.className = "filesystem-content";
     details.append(summary, content);
 
+    // Row-local wait state; the loaded tree and errors live on the shared piece.
+    let rowLoading = false;
+    const repaint = bindDom(content, (el) => {
+        if (piece.fileTree) {
+            renderUnixFsTree(el, piece.fileTree);
+        } else if (piece.fileTreeError) {
+            el.replaceChildren();
+            const message = document.createElement("span");
+            message.className = "failure";
+            message.textContent = t("piece.fileTreeUnavailable", { error: piece.fileTreeError });
+            el.appendChild(message);
+        } else if (rowLoading) {
+            el.textContent = t("piece.fileTreeLoading");
+        } else {
+            el.replaceChildren();
+        }
+    });
+
     details.addEventListener("toggle", () => {
         if (!details.open) {
-            if (details.dataset.loading === "true") releaseFileTreeWaiter(piece);
+            if (rowLoading) {
+                rowLoading = false;
+                releaseFileTreeWaiter(piece);
+                repaint();
+            }
             return;
         }
-        if (piece.fileTree) {
-            renderUnixFsTree(content, piece.fileTree);
-            return;
-        }
-        if (details.dataset.loading === "true") return;
-        details.dataset.loading = "true";
-        content.textContent = "Reading CAR directory blocks …";
+        if (piece.fileTree || rowLoading) return;
+        rowLoading = true;
         if (!piece.fileTreePromise) {
+            piece.fileTreeError = null;
             const controller = new AbortController();
             const searchSignal = state.searchController.signal;
             const stopOnSearch = () => controller.abort(searchSignal.reason);
@@ -128,20 +166,18 @@ function createFileTreeDetails(piece) {
             });
         }
         piece.fileTreeWaiters++;
+        repaint();
         const promise = piece.fileTreePromise;
         promise.then((tree) => {
             piece.fileTree = tree;
-            if (details.open) renderUnixFsTree(content, tree);
         }).catch((error) => {
-            if (piece.fileTreePromise === promise) piece.fileTreePromise = null;
-            content.replaceChildren();
-            if (!details.open) return;
-            const message = document.createElement("span");
-            message.className = "failure";
-            message.textContent = `File tree unavailable: ${error.message}`;
-            content.appendChild(message);
+            if (piece.fileTreePromise === promise) {
+                piece.fileTreePromise = null;
+                piece.fileTreeError = errorText(error);
+            }
         }).finally(() => {
-            details.dataset.loading = "false";
+            rowLoading = false;
+            repaint();
         });
     });
     return details;
@@ -158,8 +194,8 @@ function createDownloadSizeHint(size) {
     if (!isLargeDownload(size)) return null;
     const hint = document.createElement("span");
     hint.className = "download-size-hint";
-    hint.textContent = `Large CAR · ${formatBytes(size)}`;
-    hint.title = `This download is a CAR file of about ${formatBytes(size)}. Check your connection and available disk space before starting.`;
+    bindText(hint, () => t("piece.largeCar", { size: formatBytes(size) }));
+    bindAttr(hint, "title", () => t("piece.largeCarTooltip", { size: formatBytes(size) }));
     return hint;
 }
 
@@ -171,7 +207,8 @@ function createPieceRow(piece, index, providerUrl, cdnUrl, providerServiceUrl, c
     heading.className = "piece-heading";
     const pieceTitle = document.createElement("span");
     pieceTitle.className = "piece-title";
-    pieceTitle.textContent = `PieceID ${piece.id} · ${piece.size === null ? "size unavailable" : formatBytes(piece.size)}`;
+    // "PieceID" is a protocol term and stays untranslated in every locale.
+        bindText(pieceTitle, () => `PieceID ${piece.id} · ${piece.size === null ? t("piece.sizeUnavailable") : formatBytes(piece.size)}`);
     const duplicateReference = document.createElement("span");
     duplicateReference.className = "piece-duplicate-reference";
     duplicateReference.hidden = true;
@@ -183,17 +220,17 @@ function createPieceRow(piece, index, providerUrl, cdnUrl, providerServiceUrl, c
     cid.className = "piece-cid";
     const cidLabel = document.createElement("span");
     cidLabel.className = "piece-link-label";
-    cidLabel.textContent = "Piece CID:";
+    bindText(cidLabel, () => t("piece.cidLabel"));
     const pieceCid = document.createElement("span");
     pieceCid.className = "piece-hash";
     pieceCid.textContent = piece.cid;
-    const pieceCopyControl = createHashCopyControl(piece.cid, "Copy Piece CID to clipboard");
+    const pieceCopyControl = createHashCopyControl(piece.cid, () => t("piece.copyCid"));
     cid.append(cidLabel, pieceCid, pieceCopyControl.button, pieceCopyControl.status);
 
     const downloads = document.createElement("div");
     downloads.className = "piece-downloads";
-    if (cdnUrl) downloads.appendChild(createDownloadLink(cdnUrl, "Download from CDN", "CDN"));
-    if (providerUrl) downloads.appendChild(createDownloadLink(providerUrl, "Download from storage provider", "Provider"));
+    if (cdnUrl) downloads.appendChild(createDownloadLink(cdnUrl, () => t("piece.downloadCdn"), () => "CDN"));
+    if (providerUrl) downloads.appendChild(createDownloadLink(providerUrl, () => t("piece.downloadProvider"), () => t("piece.sourceProvider"), "download", "provider"));
     linksLine.appendChild(cid);
     if (downloads.childElementCount > 0) {
         const sizeHint = createDownloadSizeHint(piece.size);
@@ -208,35 +245,35 @@ function createPieceRow(piece, index, providerUrl, cdnUrl, providerServiceUrl, c
     rootInfo.className = "piece-root";
     const rootLinks = document.createElement("div");
     rootLinks.className = "piece-root-links";
-    rootInfo.textContent = "CAR root pending …";
+    rootInfo.textContent = t("piece.rootPending");
     result.append(rootInfo, rootLinks);
     element.append(identity, result, createFileTreeDetails(indexedPiece));
     return { element, result: rootInfo, duplicateReference };
 }
 
-function renderCarRoots(container, roots, source) {
+function renderCarRoots(container, roots, sourceRender) {
     container.replaceChildren();
     container.classList.add("has-roots");
     const explorerLinks = container.parentElement.querySelector(".piece-root-links");
     explorerLinks?.replaceChildren();
     const caption = document.createElement("span");
     caption.className = "piece-link-label";
-    caption.textContent = "CAR root: ";
-    caption.title = `Read from ${source}`;
+    caption.textContent = t("piece.rootPrefix");
+    caption.title = t("piece.rootReadFrom", { source: sourceRender() });
     container.appendChild(caption);
     roots.forEach((root, index) => {
         if (index > 0) container.append(document.createTextNode(", "));
         const rootHash = document.createElement("span");
         rootHash.className = "piece-root-hash";
         rootHash.textContent = root;
-        const rootCopyControl = createHashCopyControl(root, "Copy CAR root CID to clipboard");
+        const rootCopyControl = createHashCopyControl(root, () => t("piece.copyRoot"));
         container.append(rootHash, rootCopyControl.button, rootCopyControl.status);
 
         if (explorerLinks) {
             explorerLinks.appendChild(createDownloadLink(
                 `https://inbrowser.link/ipfs/${root}`,
-                `Open CAR root ${root} on inbrowser.link`,
-                "inbrowser",
+                () => t("piece.openRoot", { root }),
+                () => "inbrowser",
                 "external"
             ));
         }

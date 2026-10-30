@@ -4,76 +4,77 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#f3f5ef">
-    <meta name="description" content="Look up FEVM addresses or ENS names to inspect Filecoin Warm Storage datasets, pieces, CAR roots, wallet balances and Filecoin Pay runway.">
-    <title>Filecoin Onchain Cloud Dashboard</title>
+    <meta name="description" data-i18n="meta.description">
+    <title data-i18n="meta.title">Filecoin Onchain Cloud Dashboard</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="./css/styles.css">
 </head>
 <body>
     <main>
         <noscript>
-            <p class="message error">This dashboard needs JavaScript to query Filecoin RPC endpoints. Enable JavaScript and reload the page.</p>
+            <!-- Not translatable: this text only renders when JavaScript is disabled. -->
+            <p class="message error" lang="en">This dashboard needs JavaScript to query Filecoin RPC endpoints. Enable JavaScript and reload the page.</p>
         </noscript>
         <header>
-            <p class="eyebrow">Filecoin Onchain Cloud</p>
-            <h1>Hosted data overview.</h1>
-            <p class="intro">Look up datasets for an FEVM address or ENS name, inspect stored Pieces, and view their corresponding IPFS root CIDs.</p>
+            <p class="eyebrow" data-i18n="main.eyebrow">Filecoin Onchain Cloud</p>
+            <h1 data-i18n="main.title">Hosted data overview.</h1>
+            <p class="intro" data-i18n="main.intro">Look up datasets for an FEVM address or ENS name, inspect stored Pieces, and view their corresponding IPFS root CIDs.</p>
         </header>
 
         <form class="lookup" id="lookupForm">
             <div>
-                <label for="walletAddress">FEVM address (0x, f410, t410) or ENS name</label>
-                <input id="walletAddress" name="walletAddress" type="text" spellcheck="false" autocomplete="off" placeholder="0x…, f410… or name.eth" aria-describedby="addressHint" required>
+                <label for="walletAddress" data-i18n="form.walletAddressLabel">FEVM address (0x, f410, t410) or ENS name</label>
+                <input id="walletAddress" name="walletAddress" type="text" spellcheck="false" autocomplete="off" placeholder="0x…, f410… or name.eth" data-i18n-placeholder="form.addressPlaceholder" aria-describedby="addressHint" required>
             </div>
             <button id="fetchBtn" type="submit">Look up address or ENS</button>
-            <div class="network-switch" role="radiogroup" aria-label="Filecoin network">
-                <label class="network-choice"><input type="radio" name="network" value="mainnet" checked><span>Mainnet</span></label>
-                <label class="network-choice"><input type="radio" name="network" value="calibration"><span>Calibration</span></label>
+            <div class="network-switch" role="radiogroup" aria-label="Filecoin network" data-i18n-aria="form.networkSwitchLabel">
+                <label class="network-choice"><input type="radio" name="network" value="mainnet" checked><span data-i18n="network.mainnet">Mainnet</span></label>
+                <label class="network-choice"><input type="radio" name="network" value="calibration"><span data-i18n="network.calibration">Calibration</span></label>
             </div>
-            <p class="hint" id="addressHint">Enter a 0x, f410 or t410 address, or an ENS name. ENS names are resolved on Ethereum Mainnet; only public read calls are made.</p>
+            <p class="hint" id="addressHint" data-i18n="form.addressHint">Enter a 0x, f410 or t410 address, or an ENS name. ENS names are resolved on Ethereum Mainnet; only public read calls are made.</p>
         </form>
 
         <section id="accountOverview" aria-live="polite" hidden>
             <hr class="section-divider">
             <div class="summary">
-                <h2>Balances and storage runway</h2>
-                <span>Wallet and Filecoin Pay</span>
+                <h2 data-i18n="account.title">Balances and storage runway</h2>
+                <span data-i18n="account.subtitle">Wallet and Filecoin Pay</span>
             </div>
             <div id="balances" class="balances">
                 <div class="balance-group">
-                    <h3>Wallet balances</h3>
+                    <h3 data-i18n="account.walletBalances">Wallet balances</h3>
                     <div class="balance-metrics">
-                        <div><span>FIL balance</span><strong id="filBalance">Loading …</strong></div>
-                        <div><span>USDFC in wallet</span><strong id="usdfcBalance">Loading …</strong></div>
+                        <div><span data-i18n="account.filBalance">FIL balance</span><strong id="filBalance">Loading …</strong></div>
+                        <div><span data-i18n="account.usdfcBalance">USDFC in wallet</span><strong id="usdfcBalance">Loading …</strong></div>
                     </div>
                 </div>
                 <div class="balance-group">
-                    <h3>Filecoin Pay storage</h3>
+                    <h3 data-i18n="account.filecoinPayStorage">Filecoin Pay storage</h3>
                     <div class="balance-subsection">
-                        <h4>Prediction</h4>
+                        <h4 data-i18n="account.prediction">Prediction</h4>
                         <div class="balance-metrics">
-                            <div><span>Storage runway</span><strong id="storageRunway">Loading …</strong></div>
-                            <div><span>Total monthly storage cost</span><strong id="totalMonthlyCost" title="Current Filecoin Pay rate across active payment rails, expressed per 86,400 epochs.">Loading …</strong></div>
+                            <div><span data-i18n="account.storageRunway">Storage runway</span><strong id="storageRunway">Loading …</strong></div>
+                            <div><span data-i18n="account.totalMonthlyCost">Total monthly storage cost</span><strong id="totalMonthlyCost" title="Current Filecoin Pay rate across active payment rails, expressed per 86,400 epochs." data-i18n-title="account.monthlyCostTooltip">Loading …</strong></div>
                         </div>
                     </div>
                     <div class="balance-subsection">
-                        <h4>Account deposits</h4>
+                        <h4 data-i18n="account.accountDeposits">Account deposits</h4>
                         <div class="balance-metrics">
-                            <div><span>Total amount</span><strong id="payTotalAmount">Loading …</strong></div>
-                            <div><span>Available for withdrawal</span><strong id="payAvailableAmount">Loading …</strong></div>
-                            <div><span>Amount locked</span><strong id="payLockedAmount">Loading …</strong></div>
+                            <div><span data-i18n="account.totalAmount">Total amount</span><strong id="payTotalAmount">Loading …</strong></div>
+                            <div><span data-i18n="account.availableForWithdrawal">Available for withdrawal</span><strong id="payAvailableAmount">Loading …</strong></div>
+                            <div><span data-i18n="account.amountLocked">Amount locked</span><strong id="payLockedAmount">Loading …</strong></div>
                         </div>
                     </div>
                 </div>
-                <p class="balance-hint">Filecoin Pay amounts are denominated in USDFC; available funds exclude amounts locked by active rails. FIL is required for transaction fees. Monthly storage cost reflects active rail rates; usage-based egress and one-time operation fees can vary separately.</p>
+                <p class="balance-hint" data-i18n="account.payHint">Filecoin Pay amounts are denominated in USDFC; available funds exclude amounts locked by active rails. FIL is required for transaction fees. Monthly storage cost reflects active rail rates; usage-based egress and one-time operation fees can vary separately.</p>
             </div>
         </section>
 
         <section id="results" aria-live="polite" aria-busy="false">
-            <p class="empty-state">Enter a FEVM address or ENS name to view its datasets and pieces.</p>
+            <p class="empty-state" data-i18n="results.emptyState">Enter a FEVM address or ENS name to view its datasets and pieces.</p>
         </section>
 
-        <footer><span id="app-version">Version …</span> · <a href="https://github.com/dgrafe/foc-dashboard" target="_blank" rel="noopener noreferrer" title="Open the project on GitHub">GitHub</a></footer>
+        <footer><span id="app-version">Version …</span> · <a href="https://github.com/dgrafe/foc-dashboard" target="_blank" rel="noopener noreferrer" title="Open the project on GitHub" data-i18n-title="footer.githubTooltip" data-i18n="footer.github">GitHub</a></footer>
     </main>
 
     <script type="module" src="./js/app.js"></script>

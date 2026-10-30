@@ -1,5 +1,7 @@
 import { pieceBytesToCid, piecePayloadSizeFromBytes } from "./car.js";
-import { formatBytes } from "./format.js";
+import { t, localeTag, errorText } from "./i18n.js";
+import { bindText, bindAttr, bindDom } from "./i18n-ui.js";
+import { formatBytes, formatUnitsRounded } from "./format.js";
 import { addPieceToIndex } from "./piece-index.js";
 import { MAX_PIECES, PIECE_RENDER_CHUNK } from "./limits.js";
 import { PAY_EXPLORER_URL, PDP_EXPLORER_URL } from "./constants.js";
@@ -15,29 +17,61 @@ export function createDatasetCard(dataSet) {
     header.className = "dataset-head";
     const identity = document.createElement("div");
     const title = document.createElement("h3");
-    title.textContent = `Dataset: ${dataSet.dataSetId}`;
     const provider = document.createElement("div");
     provider.className = "dataset-meta";
-    provider.textContent = `Storage Provider: ${dataSet.serviceProvider}`;
     const endpoint = document.createElement("div");
     endpoint.className = "dataset-meta dataset-endpoint";
-    endpoint.hidden = true;
     const rail = document.createElement("div");
     rail.className = "dataset-meta dataset-endpoint";
+    const railPrefix = document.createElement("span");
     const railLink = document.createElement("a");
     railLink.href = `${PAY_EXPLORER_URL}/${getNetworkPath()}/rails/${dataSet.pdpRailId}`;
     railLink.target = "_blank";
     railLink.rel = "noopener noreferrer";
     railLink.textContent = dataSet.pdpRailId.toString();
-    railLink.title = "Open payment rail on Filecoin Pay";
-    rail.append("Payment Rail: ", keepLinkInteractive(railLink));
+    bindAttr(railLink, "title", () => t("dataset.railTooltip"));
+    keepLinkInteractive(railLink);
+    rail.append(railPrefix, railLink);
     const features = document.createElement("div");
     features.className = "dataset-features";
-    renderDatasetFeatures(features, null);
-    identity.append(title, provider, endpoint, rail, features);
     const badge = document.createElement("span");
     badge.className = "piece-count";
-    badge.textContent = "Pieces: Loading …";
+
+    // Load state; the render bindings below recompute every label on a language change.
+    const model = {
+        endpointOrigin: null,
+        features: null,
+        cost: null,
+        pieceCount: 0,
+        totalPieceSize: 0n,
+        unknownSizeCount: 0,
+        partial: false,
+        piecesLoaded: false,
+        piecesFailed: false
+    };
+
+    const repaints = [
+        bindText(title, () => t("dataset.title", { id: dataSet.dataSetId })),
+        bindText(provider, () => t("dataset.storageProvider", { address: dataSet.serviceProvider })),
+        bindText(railPrefix, () => t("dataset.paymentRail")),
+        bindDom(endpoint, (el) => {
+            el.replaceChildren();
+            el.hidden = !model.endpointOrigin;
+            if (!model.endpointOrigin) return;
+            const link = document.createElement("a");
+            link.href = `${PDP_EXPLORER_URL}/${getNetworkPath()}/providers/${dataSet.serviceProvider.toLowerCase()}`;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = model.endpointOrigin;
+            bindAttr(link, "title", () => t("dataset.providerTooltip"));
+            el.append(document.createTextNode(t("dataset.providerEndpoint")), keepLinkInteractive(link));
+        }),
+        bindDom(features, (el) => renderDatasetFeatures(el, model.features)),
+        bindText(badge, () => badgeText(model)),
+        bindAttr(badge, "title", () => badgeTooltip(model))
+    ];
+
+    identity.append(title, provider, endpoint, rail, features);
     header.append(identity, badge);
     const pieces = document.createElement("div");
     pieces.className = "pieces";
@@ -47,34 +81,55 @@ export function createDatasetCard(dataSet) {
     moreBar.hidden = true;
     pieces.append(rowsHost, moreBar);
     element.append(header, pieces);
-    return { element, badge, pieces, rowsHost, moreBar, rows: [], rendered: 0, features, endpoint };
+    return {
+        element, badge, pieces, rowsHost, moreBar, rows: [], rendered: 0, model,
+        repaint: () => repaints.forEach((apply) => apply())
+    };
 }
 
 function renderDatasetFeatures(container, features) {
     container.replaceChildren();
-    for (const [label, active] of [["IPFS Indexing", features?.ipfsIndexing], ["CDN", features?.cdn]]) {
+    for (const [label, active] of [[t("dataset.ipfsIndexing"), features?.ipfsIndexing], [t("dataset.cdn"), features?.cdn]]) {
         const badge = document.createElement("span");
         badge.className = `dataset-feature ${active === undefined ? "unknown" : active ? "active" : "inactive"}`;
-        badge.textContent = `${label}: ${active === undefined ? "Checking …" : active ? "Active" : "Inactive"}`;
+        badge.textContent = `${label}: ${active === undefined ? t("dataset.checking") : active ? t("dataset.active") : t("dataset.inactive")}`;
         container.appendChild(badge);
     }
 }
 
+function costLabel(cost) {
+    if (!cost) return t("cost.unavailable");
+    if (cost.terminated) return t("cost.storageTerminated");
+    if (cost.amount === null) return t("cost.unavailable");
+    return t("unit.usdfcPerMonth", { value: formatUnitsRounded(cost.amount, 18) });
+}
+
+function badgeText(model) {
+    if (!model.piecesLoaded && !model.piecesFailed) return t("dataset.piecesLoading");
+    if (model.piecesFailed && model.pieceCount === 0) return t("dataset.piecesUnavailable");
+    const sizeLabel = model.unknownSizeCount
+        ? t("dataset.sizeAtLeast", { size: formatBytes(model.totalPieceSize) })
+        : formatBytes(model.totalPieceSize);
+    const params = { count: model.pieceCount, size: sizeLabel, cost: costLabel(model.cost) };
+    return model.partial ? t("dataset.badgePartial", params) : t("dataset.badge", params);
+}
+
+function badgeTooltip(model) {
+    const note = model.unknownSizeCount === 0 ? ""
+        : model.unknownSizeCount === 1 ? t("dataset.sizeUnknownNoteOne", { count: model.unknownSizeCount })
+            : t("dataset.sizeUnknownNoteMany", { count: model.unknownSizeCount });
+    return `${t("dataset.costTooltip")}${note}`;
+}
+
 export async function populateDataset(card, dataSet, address, pieceIndex, monthlyCostsPromise, isStale = () => false) {
+    const model = card.model;
     let providerServiceUrl = null;
     let cdnEnabled = false;
     try {
         providerServiceUrl = await getProviderServiceUrl(dataSet.providerId);
         if (providerServiceUrl) {
-            const serviceUrl = new URL(providerServiceUrl);
-            const link = document.createElement("a");
-            link.href = `${PDP_EXPLORER_URL}/${getNetworkPath()}/providers/${dataSet.serviceProvider.toLowerCase()}`;
-            link.target = "_blank";
-            link.rel = "noopener noreferrer";
-            link.textContent = serviceUrl.origin;
-            link.title = "Open provider entry on PDP Explorer";
-            card.endpoint.append(document.createTextNode("Provider Endpoint: "), keepLinkInteractive(link));
-            card.endpoint.hidden = false;
+            model.endpointOrigin = new URL(providerServiceUrl).origin;
+            card.repaint();
         }
     } catch (error) {
         console.warn(`Could not resolve storage provider for dataset ${dataSet.dataSetId}.`, error);
@@ -82,20 +137,16 @@ export async function populateDataset(card, dataSet, address, pieceIndex, monthl
     try {
         const features = await getDatasetFeatures(dataSet.dataSetId);
         cdnEnabled = BigInt(dataSet.cdnRailId) > 0n && features.cdn;
-        renderDatasetFeatures(card.features, { ipfsIndexing: features.ipfsIndexing, cdn: cdnEnabled });
+        model.features = { ipfsIndexing: features.ipfsIndexing, cdn: cdnEnabled };
+        card.repaint();
     } catch (error) {
         console.warn(`Could not read IPFS/CDN metadata for dataset ${dataSet.dataSetId}.`, error);
     }
 
     let cursor = 0n;
-    let pieceCount = 0;
-    let totalPieceSize = 0n;
-    let unknownSizeCount = 0;
-    let monthlyCostLabel = "monthly cost unavailable";
-    let piecesLoaded = false;
     const dirtyPieces = new Set();
     try {
-        while (pieceCount < MAX_PIECES) {
+        while (model.pieceCount < MAX_PIECES) {
             const [pieces, ids, hasMore] = await fetchPiecePage(dataSet.dataSetId, cursor);
             if (isStale()) return;
             for (let index = 0; index < pieces.length; index++) {
@@ -117,40 +168,35 @@ export async function populateDataset(card, dataSet, address, pieceIndex, monthl
                 card.rows.push(rowData);
                 dirtyPieces.add(indexedPieceOccurrence.indexedPiece);
                 card.rootLoads.push(carQueue.enqueue(rootState, piece.cid, providerServiceUrl, cdnUrl));
-                pieceCount++;
-                if (piece.size === null) unknownSizeCount++;
-                else totalPieceSize += piece.size;
+                model.pieceCount++;
+                if (piece.size === null) model.unknownSizeCount++;
+                else model.totalPieceSize += piece.size;
             }
             if (!hasMore || pieces.length === 0) break;
             cursor = ids[ids.length - 1] + 1n;
         }
-        piecesLoaded = true;
+        model.piecesLoaded = true;
     } catch (error) {
         if (isStale()) return;
-        if (pieceCount) updateDatasetBadge(card.badge, pieceCount, totalPieceSize, unknownSizeCount, true, monthlyCostLabel);
-        else card.badge.textContent = "Pieces: Unavailable";
-        addEmptyPieces(card.pieces, `Piece query failed: ${error.message}`);
+        model.piecesFailed = true;
+        if (model.pieceCount) model.partial = true;
+        card.repaint();
+        addEmptyPieces(card.pieces, () => t("dataset.pieceQueryFailed", { error: errorText(error) }));
     }
     // Rows are rendered lazily in chunks; duplicate references are refreshed once per dataset.
     renderMoreRows(card, PIECE_RENDER_CHUNK);
     dirtyPieces.forEach(updatePieceDuplicateReferences);
-    if (!piecesLoaded) return;
+    if (!model.piecesLoaded) return;
 
     try {
-        const { labels } = await monthlyCostsPromise;
-        monthlyCostLabel = labels.get(dataSet.dataSetId) || monthlyCostLabel;
+        const { costs } = await monthlyCostsPromise;
+        model.cost = costs.get(dataSet.dataSetId) ?? null;
     } catch (error) {
         console.warn(`Could not estimate monthly cost for dataset ${dataSet.dataSetId}.`, error);
     }
     if (isStale()) return;
-    updateDatasetBadge(card.badge, pieceCount, totalPieceSize, unknownSizeCount, false, monthlyCostLabel);
-    if (pieceCount === 0) addEmptyPieces(card.pieces, "No active pieces in this dataset.");
-    if (pieceCount >= MAX_PIECES) addEmptyPieces(card.pieces, `Display limited to ${MAX_PIECES.toLocaleString("en-US")} pieces.`);
+    card.repaint();
+    if (model.pieceCount === 0) addEmptyPieces(card.pieces, () => t("dataset.emptyPieces"));
+    if (model.pieceCount >= MAX_PIECES) addEmptyPieces(card.pieces, () => t("dataset.displayLimited", { count: MAX_PIECES.toLocaleString(localeTag()) }));
     await Promise.all(card.rootLoads);
-}
-
-function updateDatasetBadge(badge, pieceCount, totalSize, unknownSizeCount, partial = false, monthlyCostLabel = "monthly cost unavailable") {
-    const sizeLabel = unknownSizeCount ? `At Least ${formatBytes(totalSize)}` : formatBytes(totalSize);
-    badge.textContent = `Pieces: ${pieceCount} · Size: ${sizeLabel} · Cost: ${monthlyCostLabel}${partial ? " · Partial" : ""}`;
-    badge.title = `Current Filecoin Pay PDP rail rate, expressed per 86,400 epochs.${unknownSizeCount ? ` Size unavailable for ${unknownSizeCount} piece${unknownSizeCount === 1 ? "" : "s"}.` : ""}`;
 }

@@ -1,9 +1,9 @@
 import { decodeFunctionResult, encodeFunctionData } from "https://esm.sh/viem@2?bundle";
 import { getRail } from "https://esm.sh/@filoz/synapse-core@0.10.0/pay?bundle";
+import { t, localeTag } from "./i18n.js";
 import { PAGE_SIZE, DATASET_LOAD_CONCURRENCY, fwssAbi, pdpAbi, providerRegistryAbi } from "./constants.js";
 import { MAX_DATASETS, SECONDS_PER_DAY, PROVIDER_URL_CACHE_TTL_MS, PROVIDER_URL_CACHE_MAX_ENTRIES } from "./limits.js";
 import { hexToBytes } from "./car.js";
-import { formatUnitsRounded } from "./format.js";
 import { mapWithConcurrency } from "./concurrency.js";
 import { createRpc } from "./rpc.js";
 import { state } from "./state.js";
@@ -22,7 +22,7 @@ export async function fetchAllDataSets(address) {
         dataSets.push(...page);
         if (page.length < Number(PAGE_SIZE)) return dataSets;
     }
-    throw new Error(`The account has more than ${MAX_DATASETS.toLocaleString("en-US")} datasets; stopped for safety.`);
+    throw new Error(t("chain.tooManyDatasets", { count: MAX_DATASETS.toLocaleString(localeTag()) }));
 }
 
 export async function fetchPiecePage(dataSetId, cursor) {
@@ -73,17 +73,16 @@ async function fetchProviderServiceUrl(providerId) {
 
 export async function calculateDatasetMonthlyCosts(dataSets) {
     const costs = await mapWithConcurrency(dataSets, DATASET_LOAD_CONCURRENCY, async (dataSet) => {
-        if (dataSet.pdpEndEpoch > 0n) return { dataSetId: dataSet.dataSetId, label: "storage terminated", amount: 0n };
+        if (dataSet.pdpEndEpoch > 0n) return { dataSetId: dataSet.dataSetId, terminated: true, amount: 0n };
         try {
             const rail = await getRail(state.readClient, { railId: dataSet.pdpRailId });
-            const amount = rail.paymentRate * SECONDS_PER_DAY;
-            return { dataSetId: dataSet.dataSetId, label: `${formatUnitsRounded(amount, 18)} USDFC/mo`, amount };
+            return { dataSetId: dataSet.dataSetId, terminated: false, amount: rail.paymentRate * SECONDS_PER_DAY };
         } catch (error) {
             console.warn(`Could not read Filecoin Pay rate for dataset ${dataSet.dataSetId}.`, error);
-            return { dataSetId: dataSet.dataSetId, label: "monthly cost unavailable", amount: null };
+            return { dataSetId: dataSet.dataSetId, terminated: false, amount: null };
         }
     });
     return {
-        labels: new Map(costs.map(({ dataSetId, label }) => [dataSetId, label]))
+        costs: new Map(costs.map(({ dataSetId, terminated, amount }) => [dataSetId, { terminated, amount }]))
     };
 }

@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { buildCidIndex, findCarBlockInTail } from "../js/car.js";
 import { fetchWithTimeout } from "../js/fetch-timeout.js";
+import { setLanguage } from "../js/i18n.js";
+
+// Error texts can be translated; these assertions expect English.
+setLanguage("en");
 
 const sha256 = {
     digest: async (data) => ({ code: 0x12, digest: new Uint8Array(createHash("sha256").update(data).digest()) })

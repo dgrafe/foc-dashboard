@@ -1,4 +1,6 @@
 // DOM-free queue that loads CAR roots with bounded concurrency and tracks overall load progress.
+import { t, errorText } from "./i18n.js";
+
 export function createCarRootQueue({ fetchCarRoots, concurrency, paint = () => {}, onProgress = () => {} }) {
     const pending = [];
     const activeControllers = new Set();
@@ -19,7 +21,8 @@ export function createCarRootQueue({ fetchCarRoots, concurrency, paint = () => {
             try {
                 const providerUrl = new URL(`piece/${pieceCid}`, providerServiceUrl).toString();
                 const roots = await fetchCarRoots(providerUrl, signal);
-                setRootState(rootState, { status: "roots", roots, source: "Storage provider" });
+                const sourceRender = () => t("car.providerSource");
+                setRootState(rootState, { status: "roots", roots, source: sourceRender(), sourceRender });
                 return;
             } catch (error) {
                 if (signal?.aborted) throw error;
@@ -30,21 +33,24 @@ export function createCarRootQueue({ fetchCarRoots, concurrency, paint = () => {
         if (cdnUrl) {
             try {
                 const roots = await fetchCarRoots(cdnUrl, signal);
-                const source = providerError ? "FilBeam · provider unavailable" : "FilBeam";
-                setRootState(rootState, { status: "roots", roots, source });
+                const sourceRender = () => providerError ? t("car.cdnSourceFallback") : "FilBeam";
+                setRootState(rootState, { status: "roots", roots, source: sourceRender(), sourceRender });
                 return;
             } catch (error) {
                 if (signal?.aborted) throw error;
-                const providerMessage = providerError ? `Provider: ${providerError.message}; ` : "";
-                setRootState(rootState, { status: "failure", message: `${providerMessage}CDN: ${error.message}` });
+                const messageRender = providerError
+                    ? () => t("car.providerThenCdn", { provider: errorText(providerError), cdn: errorText(error) })
+                    : () => t("car.cdnFailure", { error: errorText(error) });
+                setRootState(rootState, { status: "failure", message: messageRender(), messageRender });
                 return;
             }
         }
 
-        setRootState(rootState, {
-            status: "failure",
-            message: `Storage provider: ${providerError?.message || "no PDP endpoint registered"}; CDN is not enabled.`
+        const messageRender = () => t("car.failureNoCdn", {
+            provider: providerError ? errorText(providerError) : t("car.noPdpEndpoint"),
+            cdn: t("car.cdnDisabled")
         });
+        setRootState(rootState, { status: "failure", message: messageRender(), messageRender });
     }
 
     function processQueue() {
@@ -57,7 +63,8 @@ export function createCarRootQueue({ fetchCarRoots, concurrency, paint = () => {
                 .then(() => task.load(controller.signal))
                 .catch((error) => {
                     if (controller.signal.aborted) return;
-                    setRootState(task.rootState, { status: "failure", message: `CAR root unavailable: ${error.message}` });
+                    const messageRender = () => t("piece.rootUnavailable", { error: errorText(error) });
+                    setRootState(task.rootState, { status: "failure", message: messageRender(), messageRender });
                     console.warn("Could not load CAR root.", error);
                 })
                 .finally(() => {

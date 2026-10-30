@@ -1,3 +1,5 @@
+import { t } from "./i18n.js";
+
 export function addPieceToIndex(index, piece, dataSetId, providerServiceUrl, cdnUrl) {
     let indexedPiece = index.get(piece.cid);
     if (!indexedPiece) {
@@ -21,7 +23,7 @@ export function getDuplicateCopies(indexedPiece, occurrence, limit = Infinity) {
         if (candidate === occurrence) continue;
         if (copies.length >= limit) break;
         copies.push({
-            label: `Dataset ${candidate.dataSetId} · PieceID ${candidate.pieceId}`,
+            label: t("piece.copyReference", { dataset: candidate.dataSetId, piece: candidate.pieceId }),
             targetId: `piece-${candidate.dataSetId}-${candidate.pieceId}`
         });
     }
